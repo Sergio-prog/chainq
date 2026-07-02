@@ -1,0 +1,38 @@
+[project]
+name = "chainq"
+version = "0.1.0"
+description = "Agent-friendly CLI for onchain and crypto market data: balances, gas, transactions, raw RPC, asset prices, Hyperliquid."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic-settings>=2.6",
+    "typer>=0.12",
+    "web3>=7.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[project.scripts]
+chainq = "chainq.cli:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["chainq"]
+
+[tool.ruff]
+line-length = 128
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

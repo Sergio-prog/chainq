@@ -1,0 +1,2 @@
+class ChainqError(Exception):
+    pass
