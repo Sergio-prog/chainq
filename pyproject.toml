@@ -1,8 +1,9 @@
 [project]
 name = "chainq"
-version = "0.1.0"
-description = "Agent-friendly CLI for onchain and crypto market data: balances, gas, transactions, raw RPC, asset prices, Hyperliquid."
+version = "0.2.0"
+description = "Agent-friendly CLI for onchain and crypto market data: balances, gas, transactions, raw RPC, asset prices, Aave, Hyperliquid."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.27",
@@ -16,6 +17,9 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.7",
 ]
+
+[project.urls]
+Repository = "https://github.com/Sergio-prog/chainq"
 
 [project.scripts]
 chainq = "chainq.cli:run"

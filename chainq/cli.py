@@ -3,8 +3,8 @@ import sys
 import httpx
 import typer
 
-from chainq import __version__
-from chainq.commands import chain, hl, market
+from chainq import __version__, update
+from chainq.commands import aave, chain, hl, market
 from chainq.errors import ChainqError
 
 app = typer.Typer(
@@ -23,7 +23,9 @@ app.command()(chain.rpc)
 app.command()(market.price)
 app.command()(market.asset)
 app.command()(market.search)
+app.command()(update.update)
 app.add_typer(hl.app, name="hl")
+app.add_typer(aave.app, name="aave")
 
 
 @app.command()
@@ -34,6 +36,7 @@ def version():
 
 def run():
     try:
+        update.maybe_remind()
         app()
     except ChainqError as exc:
         print(f"error: {exc}", file=sys.stderr)

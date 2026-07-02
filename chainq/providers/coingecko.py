@@ -1,5 +1,6 @@
 import httpx
 
+from chainq import cache
 from chainq.config import settings
 from chainq.errors import ChainqError
 
@@ -56,7 +57,11 @@ SYMBOL_TO_ID = {
 }
 
 
-def _get(path: str, params: dict | None = None) -> dict | list:
+def _get(path: str, params: dict | None = None, ttl: float = 30) -> dict | list:
+    key = cache.key_for("coingecko", path, params)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
     headers = {}
     if settings.coingecko_api_key:
         headers["x-cg-demo-api-key"] = settings.coingecko_api_key
@@ -68,14 +73,16 @@ def _get(path: str, params: dict | None = None) -> dict | list:
         raise ChainqError("CoinGecko rate limit hit; retry in ~1 minute or set COINGECKO_API_KEY")
     if resp.status_code >= 400:
         raise ChainqError(f"CoinGecko returned HTTP {resp.status_code} for {path}")
-    return resp.json()
+    result = resp.json()
+    cache.put(key, result, ttl)
+    return result
 
 
 def resolve_id(query: str) -> str:
     q = query.strip().lower()
     if q in SYMBOL_TO_ID:
         return SYMBOL_TO_ID[q]
-    coins = _get("/search", {"query": q})["coins"]
+    coins = _get("/search", {"query": q}, ttl=3600)["coins"]
     if not coins:
         raise ChainqError(f"no CoinGecko asset found for '{query}'")
     for c in coins:
@@ -106,7 +113,7 @@ def coin(coin_id: str) -> dict:
 
 
 def search(query: str) -> list[dict]:
-    return _get("/search", {"query": query})["coins"]
+    return _get("/search", {"query": query}, ttl=3600)["coins"]
 
 
 def simple_price(ids: list[str]) -> dict:

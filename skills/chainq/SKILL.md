@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, and Hyperliquid perp markets, funding rates, and account positions. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, or Hyperliquid.
+description: Query live crypto and onchain data via the chainq CLI - asset prices and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, Aave v3 lending markets (supply/borrow APY), and Hyperliquid perp markets, funding rates, and account positions. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, or Hyperliquid.
 ---
 
 # chainq
@@ -39,6 +39,16 @@ chainq rpc eth_getBlockByNumber latest false                  # params: JSON lit
 ```
 
 Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value.
+
+## Aave v3 (lending)
+
+```bash
+chainq aave markets -n ethereum        # reserves ranked by size: supply/borrow APY, utilization
+chainq aave markets -c usdc -n base    # one asset (all markets on the chain)
+chainq aave markets -s supply-apy      # sort: supplied | supply-apy | borrow-apy | utilization
+```
+
+"Best yield on USDC" type questions: run `aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
 
 ## Hyperliquid (public data, perps)
 

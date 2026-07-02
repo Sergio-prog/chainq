@@ -1,78 +1,125 @@
 # chainq
 
-Agent-friendly CLI for onchain and crypto market data. One tool for balances, gas, transactions, raw EVM RPC, asset prices, and Hyperliquid — with curated public RPC endpoints and no setup required.
+**One CLI for the crypto world — built for AI agents, pleasant for humans.**
 
-Built for AI agents first (predictable one-line output, `--json` everywhere, meaningful exit codes), pleasant for humans too.
+Query asset prices, wallet balances, gas, transactions, raw EVM RPC, Aave markets, and Hyperliquid perps from a single tool. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
+
+```console
+$ chainq price eth btc hype
+ETH (Ethereum): $1,691.88  24h +4.82%  mcap $204.11B
+BTC (Bitcoin): $61,302.00  24h +1.85%  mcap $1.23T
+HYPE (Hyperliquid): $65.79  24h +4.38%  mcap $14.63B
+
+$ chainq balance vitalik.eth
+vitalik.eth (0xd8dA…6045) on Ethereum: 5.6955 ETH (~$9,635.87)
+
+$ chainq hl funding --limit 3
+ME-PERP funding: -0.1713%/h (-1500.8% APR)  mark $0.0681  OI $371.51K
+CELO-PERP funding: -0.0272%/h (-238.2% APR)  mark $0.061639  OI $146.98K
+STABLE-PERP funding: -0.0162%/h (-142.3% APR)  mark $0.03519  OI $2.29M
+```
+
+## Why
+
+Agents are terrible at juggling five different APIs, auth schemes, and SDKs — and great at running one predictable CLI. chainq gives every command three output modes:
+
+| Mode | Flag | Output |
+|---|---|---|
+| human | *(default)* | one readable line per result |
+| machine | `--json` | structured JSON for parsing |
+| pipe | `-q` | bare primary value only |
+
+Plus `-v` for provenance (RPC endpoint used, data source, explorer links). Errors go to stderr with exit code 1. Responses are cached briefly (30–60s) so repeated queries stay fast and under rate limits.
 
 ## Install
 
+One-liner:
+
 ```bash
-uv tool install chainq
+curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh
 ```
 
-or from source:
+Or directly with [uv](https://docs.astral.sh/uv/) / pipx:
 
 ```bash
-git clone <repo> && cd chainq
+uv tool install --from git+https://github.com/Sergio-prog/chainq chainq
+pipx install git+https://github.com/Sergio-prog/chainq
+```
+
+From source:
+
+```bash
+git clone https://github.com/Sergio-prog/chainq && cd chainq
 uv tool install .
 ```
 
-## Quickstart
+Requires Python 3.12+ (the install script bootstraps uv, which handles that for you). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style.
+
+## Commands
+
+### Market data (CoinGecko)
 
 ```bash
-chainq price eth btc hype
-chainq balance vitalik.eth
-chainq balance 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --coin usdt --network arbitrum
-chainq gas --network base
-chainq tx 0x... --network ethereum
-chainq rpc eth_blockNumber --network optimism
-chainq asset ethena
-chainq search "sky protocol"
-chainq hl price BTC ETH
-chainq hl funding --limit 10
-chainq hl positions 0x...
-chainq networks
+chainq price eth btc sol         # spot price, 24h change, market cap
+chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
+chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
 
-## Output modes
-
-Every command supports three modes:
+### Onchain (EVM)
 
 ```bash
-$ chainq price eth
-ETH (Ethereum): $2,543.12  24h +1.20%  mcap $306.51B
-
-$ chainq price eth -q
-2543.12
-
-$ chainq price eth --json
-[{"id": "ethereum", "symbol": "eth", "price_usd": 2543.12, ...}]
+chainq networks                                       # supported networks and aliases
+chainq balance vitalik.eth                            # native balance, ENS supported
+chainq balance 0x... --coin usdt -n arbitrum          # ERC-20 by symbol or contract address
+chainq gas -n base                                    # gas price, base fee, transfer cost in USD
+chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
+chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch
 ```
 
-`-v` adds detail (RPC endpoint used, extra market fields, explorer links). Errors go to stderr with exit code 1.
+Networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`.
 
-## Networks
+### Aave v3
 
-EVM chains with curated public RPCs and automatic fallback: ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain. Accepts aliases (`eth`, `arb`, `op`, ...) and chain ids. Override any RPC with `CHAINQ_RPC_<NETWORK>`, e.g. `CHAINQ_RPC_ETHEREUM=https://...`.
+```bash
+chainq aave markets -n ethereum                # reserves: supply/borrow APY, size, utilization
+chainq aave markets -c usdc -n base            # one asset across markets
+chainq aave markets -s borrow-apy -l 10        # sort: supplied | supply-apy | borrow-apy | utilization
+```
+
+### Hyperliquid (perps, public data)
+
+```bash
+chainq hl price BTC ETH          # mark/oracle price, 24h change, volume, OI, funding
+chainq hl markets -s oi          # top markets by volume | oi | funding | change
+chainq hl funding                # most extreme funding rates (hourly + APR)
+chainq hl positions 0xADDRESS    # account value, margin, open positions with PnL
+```
 
 ## Configuration
 
-Optional. Env vars, or a `.env` in the working directory or `~/.config/chainq/.env`:
+Everything works without configuration. Optional env vars (or `.env` in cwd / `~/.config/chainq/.env`):
 
 | Variable | Purpose |
 |---|---|
 | `COINGECKO_API_KEY` | raises CoinGecko rate limits (free demo key works) |
-| `OPENSEA_API_KEY` | reserved for upcoming NFT commands |
-| `CHAINQ_RPC_<NETWORK>` | custom RPC endpoint, tried first |
+| `CHAINQ_RPC_<NETWORK>` | custom RPC endpoint, tried first (e.g. `CHAINQ_RPC_ETHEREUM`) |
 | `CHAINQ_HTTP_TIMEOUT` / `CHAINQ_RPC_TIMEOUT` | timeouts in seconds |
+| `CHAINQ_NO_UPDATE_CHECK` | disable the daily update check |
+| `OPENSEA_API_KEY` | reserved for upcoming NFT commands |
 
-## Agent skill
+## For AI agents
 
-`skills/chainq/` contains a Claude Code skill teaching agents when and how to use chainq. Install it:
+chainq ships a [Claude Code skill](skills/chainq/SKILL.md) that teaches agents when and how to use it:
 
 ```bash
 ln -s "$(pwd)/skills/chainq" ~/.claude/skills/chainq
 ```
+
+No skill installed? Agents can self-discover everything via `chainq -h` and `chainq <command> -h`.
+
+## Roadmap
+
+NFT floors, Uniswap pools, stablecoin protocols (Sky, Ethena), portfolio sweep, Solana, and more — see [ROADMAP.md](ROADMAP.md).
 
 ## Development
 
@@ -81,3 +128,7 @@ uv sync
 uv run pytest
 uv run ruff check .
 ```
+
+## License
+
+[MIT](LICENSE)
