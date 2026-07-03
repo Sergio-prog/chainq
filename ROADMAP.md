@@ -16,10 +16,10 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 - **v0.8** — Morpho (markets + vaults via official GraphQL API); DefiLlama adapter (`llama protocol/top/chains` for any protocol); `chainq config` command; HTTP retry with backoff on all providers; parallel RPC endpoint racing; shell completions.
 - **v0.9** — NFTs via OpenSea (`nft floor/collection/top`): floors with USD conversion, volumes, owners, supply; keyless for well-known collections, API key unlocks `top` and long-tail slugs.
 - **v0.10** — stablecoins: `stables` overview (mcap ranking, peg price, supply changes via DefiLlama stablecoins API), `sky rate` (SSR + legacy DSR read onchain), `ethena yield` (sUSDe APY via official API, USDe supply/peg).
+- **v0.11** — `portfolio`: parallel sweep of native + registry tokens across all 25 networks with one batched CoinGecko pricing call, sorted by USD value; `--min-usd` dust filter, `-n` repeatable network filter.
 
 ## Next
 
-- **Portfolio** — one command sweeping native + known tokens across all networks for an address, totals in USD.
 - **PyPI release** — then Homebrew tap; install.sh switches to PyPI as default source.
 
 ## Later

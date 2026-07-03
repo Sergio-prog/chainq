@@ -79,6 +79,7 @@ chainq search "sky protocol"     # resolve fuzzy names to asset ids
 chainq networks                                       # supported networks and aliases
 chainq balance vitalik.eth                            # native balance, ENS supported
 chainq balance 0x... --coin usdt -n arbitrum          # ERC-20 by symbol or contract address
+chainq portfolio vitalik.eth                          # all networks: native + known tokens, USD total
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch

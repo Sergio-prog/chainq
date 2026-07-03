@@ -49,6 +49,8 @@ Prefer `price` for "how much is X"; use `asset` when the user wants depth (suppl
 
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
+chainq portfolio vitalik.eth                                  # sweep ALL networks: native + known tokens, USD total
+chainq portfolio 0x... -n ethereum -n base --min-usd 1        # restrict networks, hide dust
 chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
 chainq gas -n base                                            # gas price, base fee, transfer cost in USD
@@ -150,7 +152,7 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 
 ## Recipes
 
-- "What's in this wallet?" — run `balance` for native plus likely stables (`usdt`, `usdc`) on the relevant networks, `--json` and sum `value_usd`.
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`). Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
 - "Did my tx go through?" — `tx 0xHASH -n <network>`; check `status` and quote the explorer link from `-v`.
 - Anything chainq lacks a command for on EVM — `chainq rpc <method> [params...]`.

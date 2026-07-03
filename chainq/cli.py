@@ -4,7 +4,7 @@ import httpx
 import typer
 
 from chainq import __version__, update
-from chainq.commands import chain, config, market, nft, protocols, stables
+from chainq.commands import chain, config, market, nft, portfolio, protocols, stables
 from chainq.errors import ChainqError
 
 app = typer.Typer(
@@ -20,6 +20,7 @@ app.command()(chain.balance)
 app.command()(chain.gas)
 app.command()(chain.tx)
 app.command()(chain.rpc)
+app.command()(portfolio.portfolio)
 app.command()(market.price)
 app.command()(market.asset)
 app.command()(market.search)
