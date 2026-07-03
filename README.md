@@ -82,7 +82,7 @@ chainq tx 0xHASH -n ethereum                          # status, parties, value, 
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch
 ```
 
-Networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`.
+25 networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`.
 
 ### Protocols
 
@@ -97,21 +97,34 @@ chainq protocols aave markets -s borrow-apy       # sort: supplied | supply-apy 
 Uniswap and Pendle:
 
 ```bash
-chainq protocols uniswap pools "weth usdc"        # pools: price, 24h volume, liquidity, v2/v3/v4
+chainq protocols uniswap pool weth usdc           # onchain v3 pool state: price + reserves per fee tier
+chainq protocols uniswap pools "weth usdc"        # pool discovery: price, 24h volume, liquidity, v2/v3/v4
 chainq protocols uniswap stats                    # protocol TVL + volumes
 chainq protocols pendle markets -s implied-apy    # yield markets: implied APY, LP APY, expiry
 ```
 
-Hyperliquid (public data):
+Hyperliquid (public data, incl. HIP-3 builder dexs and HIP-4 outcome markets):
 
 ```bash
 chainq protocols hl price BTC ETH                 # perps: mark price, 24h change, volume, OI, funding
 chainq protocols hl markets -s oi                 # top perp markets by volume | oi | funding | change
 chainq protocols hl funding                       # most extreme funding rates (hourly + APR)
 chainq protocols hl positions 0xADDRESS           # perp account: value, margin, positions with PnL
+chainq protocols hl dexs                          # HIP-3 builder-deployed perp dexs
+chainq protocols hl markets --dex xyz             # markets on a builder dex (tokenized stocks etc.)
+chainq protocols hl outcomes "world cup"          # HIP-4 prediction markets with live Yes/No prices
 chainq protocols hl spot price HYPE               # spot pairs: price, 24h change, volume, mcap
 chainq protocols hl spot markets                  # top spot markets by volume
 chainq protocols hl spot balances 0xADDRESS       # spot token balances with USD values
+```
+
+Lighter (public data):
+
+```bash
+chainq protocols lighter markets -s oi            # perp markets: last price, volume, OI, funding
+chainq protocols lighter price BTC ETH            # single markets
+chainq protocols lighter funding                  # funding rates (hourly + APR)
+chainq protocols lighter positions 0xADDRESS      # account value, collateral, open positions
 ```
 
 ## Configuration
@@ -128,10 +141,10 @@ Everything works without configuration. Optional env vars (or `.env` in cwd / `~
 
 ## For AI agents
 
-chainq ships a [Claude Code skill](skills/chainq/SKILL.md) that teaches agents when and how to use it:
+chainq ships a [skill](skills/chainq/SKILL.md) that teaches agents when and how to use it:
 
 ```bash
-ln -s "$(pwd)/skills/chainq" ~/.claude/skills/chainq
+npx skills add Sergio-prog/chainq
 ```
 
 No skill installed? Agents can self-discover everything via `chainq -h` and `chainq <command> -h`.

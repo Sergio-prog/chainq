@@ -10,6 +10,7 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 - Live-test every new or changed command against real endpoints (`uv run chainq ...`) — unit tests deliberately don't mock providers.
 - Version is defined only in `pyproject.toml` (read at runtime via importlib.metadata). Bump semver on user-visible changes.
 - `.env` holds real keys and is gitignored; never commit it, never print its values.
+- Data sources, in order of preference: the protocol's official API (Aave GraphQL, Pendle, Hyperliquid/Lighter info APIs) → onchain helper/periphery contracts (most protocols deploy them — e.g. Uniswap v3 factory/pool, Aave UiPoolDataProvider) → third-party indexers (DexScreener, DefiLlama) only for discovery/ranking that the first two can't do. Verify new RPC endpoints and API shapes live before shipping (`eth_chainId`, sample responses) — do not trust remembered addresses or schemas.
 
 ## Output contract (do not break)
 

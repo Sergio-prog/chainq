@@ -8,9 +8,11 @@ from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import hyperliquid
 from chainq.rpc import resolve_address
 
-app = typer.Typer(no_args_is_help=True, help="Hyperliquid public market data (perps and spot).")
+app = typer.Typer(no_args_is_help=True, help="Hyperliquid public market data (perps, spot, builder dexs, outcomes).")
 spot_app = typer.Typer(no_args_is_help=True, help="Hyperliquid spot markets and balances.")
 app.add_typer(spot_app, name="spot")
+
+DexOpt = Annotated[str, typer.Option("--dex", "-d", help="HIP-3 builder dex name (see `hl dexs`); empty = main dex")]
 
 
 def _market_line(m: dict) -> str:
@@ -23,9 +25,10 @@ def _market_line(m: dict) -> str:
 
 def _find(markets: list[dict], coins: list[str]) -> list[dict]:
     by_coin = {m["coin"].upper(): m for m in markets}
+    by_short = {m["coin"].split(":")[-1].upper(): m for m in markets}
     selected = []
     for coin in coins:
-        m = by_coin.get(coin.upper())
+        m = by_coin.get(coin.upper()) or by_short.get(coin.upper())
         if m is None:
             raise ChainqError(f"no Hyperliquid perp market for '{coin}'")
         selected.append(m)
@@ -34,7 +37,8 @@ def _find(markets: list[dict], coins: list[str]) -> list[dict]:
 
 @app.command()
 def price(
-    coins: Annotated[list[str], typer.Argument(help="perp coins, e.g. BTC ETH HYPE")],
+    coins: Annotated[list[str], typer.Argument(help="perp coins, e.g. BTC ETH HYPE (or xyz:TSLA / TSLA with --dex xyz)")],
+    dex: DexOpt = "",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -42,7 +46,7 @@ def price(
 ):
     """Mark price, 24h change, volume, OI, and funding for perp markets."""
     out = Out(json_out, quiet, verbose, format)
-    selected = _find(hyperliquid.perp_markets(), coins)
+    selected = _find(hyperliquid.perp_markets(dex), coins)
     out.emit(
         selected,
         [_market_line(m) for m in selected],
@@ -59,6 +63,7 @@ def price(
 def markets(
     limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
     sort: Annotated[str, typer.Option("--sort", "-s", help="volume | oi | funding | change")] = "volume",
+    dex: DexOpt = "",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -74,7 +79,7 @@ def markets(
     }
     if sort not in keys:
         raise ChainqError(f"unknown sort '{sort}' (use: {', '.join(keys)})")
-    ranked = sorted(hyperliquid.perp_markets(), key=keys[sort], reverse=True)[:limit]
+    ranked = sorted(hyperliquid.perp_markets(dex), key=keys[sort], reverse=True)[:limit]
     out.emit(
         ranked,
         [_market_line(m) for m in ranked],
@@ -86,6 +91,7 @@ def markets(
 def funding(
     coins: Annotated[list[str] | None, typer.Argument(help="perp coins; omit for top by |rate|")] = None,
     limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
+    dex: DexOpt = "",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -93,7 +99,7 @@ def funding(
 ):
     """Current hourly funding rates and annualized APR."""
     out = Out(json_out, quiet, verbose, format)
-    all_markets = hyperliquid.perp_markets()
+    all_markets = hyperliquid.perp_markets(dex)
     if coins:
         selected = _find(all_markets, coins)
     else:
@@ -165,6 +171,90 @@ def positions(
         "positions": positions_data,
     }
     out.emit(data, lines, quiet_value=account_value)
+
+
+@app.command()
+def dexs(
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """List HIP-3 builder-deployed perp dexs (use their name with --dex)."""
+    out = Out(json_out, quiet, verbose, format)
+    rows = [
+        {
+            "name": d.get("name"),
+            "full_name": d.get("fullName"),
+            "deployer": d.get("deployer"),
+            "markets": len(d.get("assetToStreamingOiCap") or []),
+        }
+        for d in hyperliquid.perp_dexs()
+    ]
+    lines = [
+        f"{r['name']}: {r['full_name'] or 'n/a'}  ({r['markets']} markets, deployer {short_addr(r['deployer'] or '')})"
+        for r in rows
+    ]
+    out.emit(rows, lines, quiet_value="\n".join(r["name"] or "" for r in rows))
+
+
+def _parse_outcome_description(description: str) -> dict:
+    if ":" not in description or "|" not in description and not description.startswith("class:"):
+        return {}
+    parts = dict(part.split(":", 1) for part in description.split("|") if ":" in part)
+    return parts if "class" in parts else {}
+
+
+@app.command()
+def outcomes(
+    query: Annotated[str | None, typer.Argument(help="filter by name/description substring")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """HIP-4 outcome (prediction) markets with live Yes/No prices."""
+    out = Out(json_out, quiet, verbose, format)
+    mids = hyperliquid.all_mids()
+    rows = []
+    for spec in hyperliquid.outcome_meta():
+        outcome_id = spec.get("outcome")
+        description = spec.get("description") or ""
+        if query and query.lower() not in f"{spec.get('name', '')} {description}".lower():
+            continue
+        yes = mids.get(f"#{outcome_id * 10}")
+        no = mids.get(f"#{outcome_id * 10 + 1}")
+        parsed = _parse_outcome_description(description)
+        rows.append(
+            {
+                "outcome": outcome_id,
+                "name": spec.get("name"),
+                "yes_price": float(yes) if yes else None,
+                "no_price": float(no) if no else None,
+                "implied_probability_pct": float(yes) * 100 if yes else None,
+                "underlying": parsed.get("underlying"),
+                "target_price": parsed.get("targetPrice"),
+                "expiry": parsed.get("expiry"),
+                "description": description[:120],
+                "quote_token": spec.get("quoteToken"),
+            }
+        )
+    rows.sort(key=lambda r: r["outcome"], reverse=True)
+    rows = rows[:limit]
+    if not rows:
+        raise ChainqError(f"no outcome markets matching '{query}'" if query else "no outcome markets found")
+    lines = []
+    for r in rows:
+        yes = f"Yes {r['yes_price']:.3f}" if r["yes_price"] is not None else "Yes n/a"
+        no = f"No {r['no_price']:.3f}" if r["no_price"] is not None else "No n/a"
+        detail = ""
+        if r["underlying"] and r["target_price"]:
+            detail = f"  [{r['underlying']} ≥ {r['target_price']}, exp {r['expiry']}]"
+        elif r["description"] and r["description"] != r["name"]:
+            detail = f"  ({r['description'][:60].rstrip()})" if not r["underlying"] else ""
+        lines.append(f"#{r['outcome']} {r['name']}: {yes} / {no}{detail}")
+    out.emit(rows, lines, quiet_value="\n".join(str(r["outcome"]) for r in rows))
 
 
 def _spot_line(m: dict) -> str:

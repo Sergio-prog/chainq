@@ -16,8 +16,14 @@ def info(payload: dict) -> dict | list:
     return resp.json()
 
 
-def perp_markets() -> list[dict]:
-    meta, ctxs = info({"type": "metaAndAssetCtxs"})
+def perp_markets(dex: str = "") -> list[dict]:
+    payload: dict = {"type": "metaAndAssetCtxs"}
+    if dex:
+        payload["dex"] = dex
+    response = info(payload)
+    if response is None:
+        raise ChainqError(f"unknown Hyperliquid perp dex '{dex}' (list them with `hl dexs`)")
+    meta, ctxs = response
     markets = []
     for asset, ctx in zip(meta["universe"], ctxs, strict=False):
         if asset.get("isDelisted"):
@@ -46,6 +52,18 @@ def perp_markets() -> list[dict]:
 
 def clearinghouse_state(address: str) -> dict:
     return info({"type": "clearinghouseState", "user": address})
+
+
+def perp_dexs() -> list[dict]:
+    return [dex for dex in info({"type": "perpDexs"}) if dex]
+
+
+def outcome_meta() -> list[dict]:
+    return info({"type": "outcomeMeta"}).get("outcomes") or []
+
+
+def all_mids() -> dict:
+    return info({"type": "allMids"})
 
 
 def spot_markets() -> list[dict]:

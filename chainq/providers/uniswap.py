@@ -9,6 +9,73 @@ TOKEN_URL = "https://api.dexscreener.com/latest/dex/tokens"
 LLAMA_TVL_URL = "https://api.llama.fi/tvl/uniswap"
 LLAMA_SUMMARY_URL = "https://api.llama.fi/summary/dexs/uniswap"
 
+V3_FACTORIES = {
+    "ethereum": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    "arbitrum": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    "optimism": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    "polygon": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    "base": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+    "bsc": "0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7",
+    "avalanche": "0x740b1c1de25031C31FF4fC9A62f554A55cdC1baD",
+    "unichain": "0x1F98400000000000000000000000000000000003",
+    "celo": "0xAfE208a311B21f13EF87E33A90049fC17A7acDEc",
+}
+
+V3_FEE_TIERS = (100, 500, 3000, 10000)
+
+V3_FACTORY_ABI = [
+    {
+        "name": "getPool",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [
+            {"name": "tokenA", "type": "address"},
+            {"name": "tokenB", "type": "address"},
+            {"name": "fee", "type": "uint24"},
+        ],
+        "outputs": [{"name": "", "type": "address"}],
+    }
+]
+
+V3_POOL_ABI = [
+    {
+        "name": "slot0",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [
+            {"name": "sqrtPriceX96", "type": "uint160"},
+            {"name": "tick", "type": "int24"},
+            {"name": "observationIndex", "type": "uint16"},
+            {"name": "observationCardinality", "type": "uint16"},
+            {"name": "observationCardinalityNext", "type": "uint16"},
+            {"name": "feeProtocol", "type": "uint8"},
+            {"name": "unlocked", "type": "bool"},
+        ],
+    },
+    {
+        "name": "liquidity",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint128"}],
+    },
+    {
+        "name": "token0",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "address"}],
+    },
+    {
+        "name": "token1",
+        "type": "function",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "address"}],
+    },
+]
+
 CHAIN_SLUGS = {
     "ethereum": "ethereum",
     "arbitrum": "arbitrum",

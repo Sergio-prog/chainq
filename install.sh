@@ -2,7 +2,6 @@
 set -eu
 
 REPO_URL="https://github.com/Sergio-prog/chainq"
-RAW_URL="https://raw.githubusercontent.com/Sergio-prog/chainq/main"
 
 if [ -t 1 ]; then
   BOLD="$(printf '\033[1m')"
@@ -63,9 +62,9 @@ say "    ${BOLD}chainq protocols aave markets${RESET}     Aave v3 supply/borrow 
 say "    ${BOLD}chainq protocols hl price BTC${RESET}     Hyperliquid perps"
 say "    ${BOLD}chainq --help${RESET}                     All commands"
 say ""
-say "  Add the skill for your agents (Claude Code):"
+say "  Add the skill for your agents:"
 say ""
-say "    ${BOLD}mkdir -p ~/.claude/skills/chainq && curl -fsSL ${RAW_URL}/skills/chainq/SKILL.md -o ~/.claude/skills/chainq/SKILL.md${RESET}"
+say "    ${BOLD}npx skills add Sergio-prog/chainq${RESET}"
 say ""
 if ! command -v chainq >/dev/null 2>&1; then
   say "  ${DIM}note: restart your shell (or add ~/.local/bin to PATH) before running chainq${RESET}"

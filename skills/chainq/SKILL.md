@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, Aave v3 lending markets (supply/borrow APY), Uniswap pools and protocol stats, Pendle yield markets (implied APY), and Hyperliquid perps and spot (prices, funding, positions, balances). Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, DEX pools, yields, or Hyperliquid.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, Aave v3 lending markets (supply/borrow APY), Uniswap pools (onchain + indexed) and protocol stats, Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, and Lighter perps. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, DEX pools, yields, funding rates, prediction markets, Hyperliquid, or Lighter.
 ---
 
 # chainq
@@ -28,7 +28,7 @@ Prefer `price` for "how much is X"; use `asset` when the user wants depth (suppl
 
 ## Onchain (EVM)
 
-Networks: ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax...), or chain ids. Default is ethereum. `chainq networks` lists all.
+25 networks: ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype...), or chain ids. Default is ethereum. `chainq networks` lists all.
 
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
@@ -55,13 +55,14 @@ chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy |
 ## Uniswap
 
 ```bash
-chainq protocols uniswap pools "weth usdc" -n ethereum   # pools for a pair: price, 24h vol, liquidity, v2/v3/v4
+chainq protocols uniswap pool weth usdc -n ethereum      # ONCHAIN v3 pool state: exact price + reserves per fee tier
+chainq protocols uniswap pool weth usdc --fee 500        # one fee tier (100 | 500 | 3000 | 10000)
+chainq protocols uniswap pools "weth usdc" -n ethereum   # discovery via indexer: 24h vol, liquidity, v2/v3/v4
 chainq protocols uniswap pools usdc -n base -s volume    # all pools for one token; sort: liquidity | volume
-chainq protocols uniswap pools 0xTokenAddress            # by token contract address
 chainq protocols uniswap stats                           # protocol TVL + 24h/7d/30d volume
 ```
 
-Pool data via DexScreener (symbols resolve through the built-in token registry; unknown symbols fall back to search — prefer addresses for long-tail tokens). Same pair appears once per fee tier/version.
+`pool` (singular) reads the v3 factory/pool contracts directly — authoritative prices and reserves. `pools` (plural) uses DexScreener for discovery/ranking (symbols resolve through the built-in token registry; prefer addresses for long-tail tokens).
 
 ## Pendle (yields)
 
@@ -83,6 +84,19 @@ chainq protocols hl positions 0xADDRESS      # perp account value, margin, posit
 chainq protocols hl spot price HYPE PURR     # spot pairs: price, 24h change, volume, mcap
 chainq protocols hl spot markets -l 10       # top spot markets by volume
 chainq protocols hl spot balances 0xADDRESS  # spot token balances with USD values
+chainq protocols hl dexs                     # HIP-3 builder-deployed perp dexs (xyz, flx, vntl...)
+chainq protocols hl markets --dex xyz        # builder dex markets (tokenized stocks, commodities)
+chainq protocols hl price TSLA --dex xyz     # coin names are dex:COIN; bare COIN works with --dex
+chainq protocols hl outcomes [QUERY]         # HIP-4 prediction markets, Yes price = implied probability
+```
+
+## Lighter (public data, perps)
+
+```bash
+chainq protocols lighter markets -l 10 -s oi   # perp markets: last price, 24h change, volume, OI, funding
+chainq protocols lighter price BTC ETH
+chainq protocols lighter funding               # hourly funding + APR
+chainq protocols lighter positions 0xADDRESS   # account value, collateral, open positions
 ```
 
 Funding is shown as hourly rate and annualized APR; negative funding means shorts pay longs.
