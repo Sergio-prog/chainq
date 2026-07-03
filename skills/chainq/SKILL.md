@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, Lighter perps, and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, Hyperliquid, or Lighter.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, Lighter perps, NFT collection floors and stats (OpenSea), and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, NFT floor prices, Hyperliquid, or Lighter.
 ---
 
 # chainq
@@ -114,6 +114,16 @@ chainq protocols hl markets --dex xyz        # builder dex markets (tokenized st
 chainq protocols hl price TSLA --dex xyz     # coin names are dex:COIN; bare COIN works with --dex
 chainq protocols hl outcomes [QUERY]         # HIP-4 prediction markets, Yes price = implied probability
 ```
+
+## NFTs (OpenSea)
+
+```bash
+chainq nft floor pudgypenguins azuki       # floor price (native + USD), 24h volume, owners
+chainq nft collection pudgypenguins        # full profile: floor, supply, volumes, contract, links
+chainq nft top -s volume -l 10             # top collections; sort: volume | 7d-volume | market-cap | owners
+```
+
+Collections are addressed by OpenSea slug (the last part of an opensea.io/collection/... URL). `floor` and `collection` need no API key for well-known collections; `nft top` and long-tail slugs require one (`chainq config set opensea-api-key <key>`).
 
 ## Lighter (public data, perps)
 

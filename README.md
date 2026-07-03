@@ -131,6 +131,14 @@ chainq protocols llama top -c Lending             # top protocols by TVL
 chainq protocols llama chains                     # chains ranked by DeFi TVL
 ```
 
+NFTs (OpenSea):
+
+```bash
+chainq nft floor pudgypenguins azuki              # floor price (native + USD), 24h volume, owners
+chainq nft collection pudgypenguins               # profile: floor, supply, volumes, contract, links
+chainq nft top -s volume                          # top collections (requires OpenSea API key)
+```
+
 Lighter (public data):
 
 ```bash
@@ -158,7 +166,7 @@ Values live in `~/.config/chainq/.env`; plain env vars and a `.env` in cwd work 
 | `CHAINQ_RPC_<NETWORK>` | custom RPC endpoint, tried first (e.g. `CHAINQ_RPC_ETHEREUM`) |
 | `CHAINQ_HTTP_TIMEOUT` / `CHAINQ_RPC_TIMEOUT` | timeouts in seconds |
 | `CHAINQ_NO_UPDATE_CHECK` | disable the daily update check |
-| `OPENSEA_API_KEY` | reserved for upcoming NFT commands |
+| `OPENSEA_API_KEY` | unlocks `nft top` and long-tail collection slugs |
 
 ## For AI agents
 
