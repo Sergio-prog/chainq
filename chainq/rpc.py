@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from web3 import Web3
@@ -40,27 +41,40 @@ class ChainClient:
     url: str
 
 
-def _candidate_urls(network: Network) -> tuple[str, ...]:
-    override = os.environ.get(f"CHAINQ_RPC_{network.key.upper()}")
-    if override:
-        return (override, *network.rpc_urls)
-    return network.rpc_urls
+def _probe(url: str, network: Network) -> ChainClient:
+    w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": settings.rpc_timeout}))
+    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+    chain_id = w3.eth.chain_id
+    if chain_id != network.chain_id:
+        raise ChainqError(f"wrong chain id {chain_id}")
+    return ChainClient(w3=w3, network=network, url=url)
 
 
 def connect(network: Network) -> ChainClient:
     failures = []
-    for url in _candidate_urls(network):
+    override = os.environ.get(f"CHAINQ_RPC_{network.key.upper()}")
+    if override:
         try:
-            w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": settings.rpc_timeout}))
-            w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-            chain_id = w3.eth.chain_id
+            return _probe(override, network)
         except Exception as exc:
-            failures.append(f"{url} ({type(exc).__name__})")
-            continue
-        if chain_id != network.chain_id:
-            failures.append(f"{url} (wrong chain id {chain_id})")
-            continue
-        return ChainClient(w3=w3, network=network, url=url)
+            failures.append(f"{override} ({type(exc).__name__})")
+    urls = network.rpc_urls
+    if len(urls) == 1:
+        try:
+            return _probe(urls[0], network)
+        except Exception as exc:
+            failures.append(f"{urls[0]} ({type(exc).__name__})")
+            raise ChainqError(f"all RPC endpoints failed for {network.name}: {'; '.join(failures)}") from None
+    pool = ThreadPoolExecutor(max_workers=len(urls))
+    try:
+        futures = {pool.submit(_probe, url, network): url for url in urls}
+        for future in as_completed(futures):
+            try:
+                return future.result()
+            except Exception as exc:
+                failures.append(f"{futures[future]} ({type(exc).__name__})")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     raise ChainqError(f"all RPC endpoints failed for {network.name}: {'; '.join(failures)}")
 
 

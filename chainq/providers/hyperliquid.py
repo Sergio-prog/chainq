@@ -1,5 +1,6 @@
 import httpx
 
+from chainq import http
 from chainq.config import settings
 from chainq.errors import ChainqError
 
@@ -8,7 +9,7 @@ INFO_URL = "https://api.hyperliquid.xyz/info"
 
 def info(payload: dict) -> dict | list:
     try:
-        resp = httpx.post(INFO_URL, json=payload, timeout=settings.http_timeout)
+        resp = http.post(INFO_URL, json=payload, timeout=settings.http_timeout)
     except httpx.HTTPError as exc:
         raise ChainqError(f"Hyperliquid request failed: {exc}") from exc
     if resp.status_code >= 400:

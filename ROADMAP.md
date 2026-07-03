@@ -13,6 +13,7 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 - **v0.5** — 25 networks (added linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana); onchain Uniswap v3 `pool` command (factory + slot0); Lighter perps (markets, price, funding, positions); Hyperliquid HIP-3 builder dexs (`hl dexs`, `--dex`) and HIP-4 outcome markets (`hl outcomes`); skill install via `npx skills add`.
 - **v0.6** — onchain Uniswap `pool` covers v2 + v3 + v4 (v2 pairs via getReserves, v4 via StateView + computed poolId, native-currency support with `eth`).
 - **v0.7** — address-based discovery: `price`/`asset` accept token contract addresses (DexScreener locates the chain → CoinGecko contract lookup → DexScreener price fallback for long-tail tokens); `uniswap pool` accepts a bare pool address with v2/v3 auto-detection.
+- **v0.8** — Morpho (markets + vaults via official GraphQL API); DefiLlama adapter (`llama protocol/top/chains` for any protocol); `chainq config` command; HTTP retry with backoff on all providers; parallel RPC endpoint racing; shell completions.
 
 ## Next
 
@@ -32,8 +33,6 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 
 ## Engineering improvements
 
-- Retry with backoff for RPC and providers; parallel RPC endpoint racing.
 - Auto token lists from CoinGecko per network instead of the hand-curated registry.
-- `chainq config` command (set keys, default network, custom RPCs).
-- Shell completions; CI (ruff + pytest + release automation); versioned CHANGELOG.
+- CI (ruff + pytest + release automation); versioned CHANGELOG.
 - Structured error output in `--json` mode (`{"error": ...}` on stdout).

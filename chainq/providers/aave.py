@@ -1,6 +1,6 @@
 import httpx
 
-from chainq import cache
+from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
 
@@ -37,7 +37,7 @@ def markets(chain_id: int) -> list[dict]:
     if cached is not None:
         return cached
     try:
-        resp = httpx.post(GRAPHQL_URL, json={"query": MARKETS_QUERY % chain_id}, timeout=settings.http_timeout)
+        resp = http.post(GRAPHQL_URL, json={"query": MARKETS_QUERY % chain_id}, timeout=settings.http_timeout)
     except httpx.HTTPError as exc:
         raise ChainqError(f"Aave API request failed: {exc}") from exc
     if resp.status_code >= 400:

@@ -4,11 +4,11 @@ import httpx
 import typer
 
 from chainq import __version__, update
-from chainq.commands import chain, market, protocols
+from chainq.commands import chain, config, market, protocols
 from chainq.errors import ChainqError
 
 app = typer.Typer(
-    add_completion=False,
+    add_completion=True,
     no_args_is_help=True,
     pretty_exceptions_enable=False,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -26,6 +26,7 @@ app.command()(market.search)
 app.command()(market.trending)
 app.command()(update.update)
 app.add_typer(protocols.app, name="protocols")
+app.add_typer(config.app, name="config")
 
 
 @app.command()

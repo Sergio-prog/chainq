@@ -1,6 +1,6 @@
 import httpx
 
-from chainq import cache
+from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
 
@@ -66,7 +66,7 @@ def _get(path: str, params: dict | None = None, ttl: float = 30, none_on_404: bo
     if settings.coingecko_api_key:
         headers["x-cg-demo-api-key"] = settings.coingecko_api_key
     try:
-        resp = httpx.get(f"{BASE_URL}{path}", params=params or {}, headers=headers, timeout=settings.http_timeout)
+        resp = http.get(f"{BASE_URL}{path}", params=params or {}, headers=headers, timeout=settings.http_timeout)
     except httpx.HTTPError as exc:
         raise ChainqError(f"CoinGecko request failed: {exc}") from exc
     if resp.status_code == 429:

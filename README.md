@@ -58,7 +58,7 @@ git clone https://github.com/Sergio-prog/chainq && cd chainq
 uv tool install .
 ```
 
-Requires Python 3.12+ (the install script bootstraps uv, which handles that for you). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style.
+Requires Python 3.12+ (the install script bootstraps uv, which handles that for you). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
 
 ## Commands
 
@@ -121,6 +121,16 @@ chainq protocols hl spot markets                  # top spot markets by volume
 chainq protocols hl spot balances 0xADDRESS       # spot token balances with USD values
 ```
 
+Morpho and DefiLlama:
+
+```bash
+chainq protocols morpho markets -c usdc -n base   # Morpho lending markets: APYs, lltv, utilization
+chainq protocols morpho vaults -c usdc            # Morpho vaults: APY, TVL
+chainq protocols llama protocol lido              # any protocol's TVL/fees/volume via DefiLlama
+chainq protocols llama top -c Lending             # top protocols by TVL
+chainq protocols llama chains                     # chains ranked by DeFi TVL
+```
+
 Lighter (public data):
 
 ```bash
@@ -132,7 +142,15 @@ chainq protocols lighter positions 0xADDRESS      # account value, collateral, o
 
 ## Configuration
 
-Everything works without configuration. Optional env vars (or `.env` in cwd / `~/.config/chainq/.env`):
+Everything works without configuration. To persist settings, use `chainq config`:
+
+```bash
+chainq config set coingecko-api-key CG-xxxx
+chainq config set chainq-rpc-ethereum https://my-node.example.com
+chainq config list        # secrets masked; --show-secrets to reveal
+```
+
+Values live in `~/.config/chainq/.env`; plain env vars and a `.env` in cwd work too:
 
 | Variable | Purpose |
 |---|---|

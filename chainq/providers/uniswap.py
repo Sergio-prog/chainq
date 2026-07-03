@@ -1,6 +1,6 @@
 import httpx
 
-from chainq import cache
+from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
 
@@ -193,7 +193,7 @@ def _get(url: str, params: dict | None = None, ttl: float = 60) -> dict:
     if cached is not None:
         return cached
     try:
-        resp = httpx.get(url, params=params or {}, timeout=settings.http_timeout)
+        resp = http.get(url, params=params or {}, timeout=settings.http_timeout)
     except httpx.HTTPError as exc:
         raise ChainqError(f"request failed: {exc}") from exc
     if resp.status_code >= 400:

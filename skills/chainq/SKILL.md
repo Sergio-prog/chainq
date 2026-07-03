@@ -13,7 +13,8 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 - Add `--json` to any command for structured output you need to parse or compute over.
 - Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
 - `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
-- Errors: stderr + exit code 1. A CoinGecko rate-limit error means wait ~1 minute (or set `COINGECKO_API_KEY`); RPC commands are not affected by it.
+- Errors: stderr + exit code 1. A CoinGecko rate-limit error means wait ~1 minute (or `chainq config set coingecko-api-key <key>`); RPC commands are not affected by it.
+- Persistent settings (API keys, custom RPCs, timeouts): `chainq config set/get/list/unset` — no manual .env editing needed.
 
 ## Market data (CoinGecko)
 
@@ -78,6 +79,24 @@ chainq protocols pendle markets -c usde -s implied-apy   # filter by name; sort:
 ```
 
 "Fixed yield on X" questions: implied APY is the fixed rate you lock by buying PT. Filter with `-c` and compare `implied_apy_pct` from `--json`.
+
+## Morpho (lending)
+
+```bash
+chainq protocols morpho markets -n base -c usdc          # markets: supply/borrow APY, lltv, utilization
+chainq protocols morpho markets -s borrow-apy            # sort: supplied | supply-apy | borrow-apy | utilization
+chainq protocols morpho vaults -c usdc                   # curated vaults: APY (gross + net), TVL
+```
+
+## DefiLlama (any protocol/chain)
+
+```bash
+chainq protocols llama protocol lido                     # TVL, chains, fees, dex volume for ANY protocol
+chainq protocols llama top -c Lending -l 10              # top protocols by TVL, optional category
+chainq protocols llama chains                            # chains ranked by DeFi TVL
+```
+
+Use `llama protocol` when the user asks about a protocol chainq has no dedicated command for — DefiLlama tracks thousands.
 
 ## Hyperliquid (public data)
 

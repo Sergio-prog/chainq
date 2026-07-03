@@ -1,6 +1,6 @@
 import httpx
 
-from chainq import cache
+from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
 
@@ -13,7 +13,7 @@ def active_markets(chain_id: int) -> list[dict]:
     if cached is not None:
         return cached
     try:
-        resp = httpx.get(f"{BASE_URL}/{chain_id}/markets/active", timeout=settings.http_timeout)
+        resp = http.get(f"{BASE_URL}/{chain_id}/markets/active", timeout=settings.http_timeout)
     except httpx.HTTPError as exc:
         raise ChainqError(f"Pendle API request failed: {exc}") from exc
     if resp.status_code == 404:
