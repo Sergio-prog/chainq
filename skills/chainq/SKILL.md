@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, Aave v3 lending markets (supply/borrow APY), and Hyperliquid perps and spot (prices, funding, positions, balances). Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, or Hyperliquid.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, Aave v3 lending markets (supply/borrow APY), Uniswap pools and protocol stats, Pendle yield markets (implied APY), and Hyperliquid perps and spot (prices, funding, positions, balances). Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, DEX pools, yields, or Hyperliquid.
 ---
 
 # chainq
@@ -51,6 +51,26 @@ chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy |
 ```
 
 "Best yield on USDC" type questions: run `protocols aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
+
+## Uniswap
+
+```bash
+chainq protocols uniswap pools "weth usdc" -n ethereum   # pools for a pair: price, 24h vol, liquidity, v2/v3/v4
+chainq protocols uniswap pools usdc -n base -s volume    # all pools for one token; sort: liquidity | volume
+chainq protocols uniswap pools 0xTokenAddress            # by token contract address
+chainq protocols uniswap stats                           # protocol TVL + 24h/7d/30d volume
+```
+
+Pool data via DexScreener (symbols resolve through the built-in token registry; unknown symbols fall back to search — prefer addresses for long-tail tokens). Same pair appears once per fee tier/version.
+
+## Pendle (yields)
+
+```bash
+chainq protocols pendle markets -n ethereum              # active markets: implied APY, LP APY, liquidity, expiry
+chainq protocols pendle markets -c usde -s implied-apy   # filter by name; sort: liquidity | implied-apy | expiry
+```
+
+"Fixed yield on X" questions: implied APY is the fixed rate you lock by buying PT. Filter with `-c` and compare `implied_apy_pct` from `--json`.
 
 ## Hyperliquid (public data)
 

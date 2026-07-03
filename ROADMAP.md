@@ -9,11 +9,11 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 - **v0.1** — 9 EVM networks with curated fallback RPCs; `balance` (native + ERC-20, ENS), `gas`, `tx`, raw `rpc`; CoinGecko `price`/`asset`/`search`; Hyperliquid perps (`hl price/markets/funding/positions`); `--json` / `-q` / `-v` output contract; agent skill.
 - **v0.2** — Aave v3 markets (official GraphQL API); TTL cache; `chainq update` + daily new-version reminder; `install.sh`.
 - **v0.3** — `protocols` command group (aave, hl); Hyperliquid spot (prices, markets, balances); `trending`; `--format table|toon` output formats; AGENTS.md; banner installer.
+- **v0.4** — Uniswap (pools via DexScreener, protocol stats via DefiLlama) and Pendle (active markets, implied/LP APY) under `protocols`.
 
 ## Next
 
 - **NFTs** — OpenSea collection floors, stats, top collections (API key support already wired).
-- **Uniswap** — pool lookup, TVL, volume, fees, top pools per network.
 - **Stablecoin protocols** — Sky (savings rate), Ethena (sUSDe yield, backing), stablecoin mcap overview.
 - **Long-tail token prices** — DexScreener fallback when CoinGecko misses (provider code exists in PriceAlerts).
 - **Portfolio** — one command sweeping native + known tokens across all networks for an address, totals in USD.

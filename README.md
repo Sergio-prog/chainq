@@ -94,6 +94,14 @@ chainq protocols aave markets -c usdc -n base     # one asset across markets
 chainq protocols aave markets -s borrow-apy       # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
+Uniswap and Pendle:
+
+```bash
+chainq protocols uniswap pools "weth usdc"        # pools: price, 24h volume, liquidity, v2/v3/v4
+chainq protocols uniswap stats                    # protocol TVL + volumes
+chainq protocols pendle markets -s implied-apy    # yield markets: implied APY, LP APY, expiry
+```
+
 Hyperliquid (public data):
 
 ```bash
