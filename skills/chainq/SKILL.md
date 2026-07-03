@@ -55,14 +55,15 @@ chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy |
 ## Uniswap
 
 ```bash
-chainq protocols uniswap pool weth usdc -n ethereum      # ONCHAIN v3 pool state: exact price + reserves per fee tier
+chainq protocols uniswap pool weth usdc -n ethereum      # ONCHAIN pool state, all of v2+v3+v4 per fee tier
+chainq protocols uniswap pool eth usdc -V v4             # 'eth' = native currency (v4 pools use it); -V v2|v3|v4|all
 chainq protocols uniswap pool weth usdc --fee 500        # one fee tier (100 | 500 | 3000 | 10000)
-chainq protocols uniswap pools "weth usdc" -n ethereum   # discovery via indexer: 24h vol, liquidity, v2/v3/v4
+chainq protocols uniswap pools "weth usdc" -n ethereum   # discovery via indexer: 24h vol, liquidity
 chainq protocols uniswap pools usdc -n base -s volume    # all pools for one token; sort: liquidity | volume
 chainq protocols uniswap stats                           # protocol TVL + 24h/7d/30d volume
 ```
 
-`pool` (singular) reads the v3 factory/pool contracts directly — authoritative prices and reserves. `pools` (plural) uses DexScreener for discovery/ranking (symbols resolve through the built-in token registry; prefer addresses for long-tail tokens).
+`pool` (singular) reads factory/pool/StateView contracts directly — authoritative prices and reserves (v4 reports price + in-range liquidity, no reserves; its biggest pools use native 'eth', not weth). `pools` (plural) uses DexScreener for discovery/ranking (symbols resolve through the built-in token registry; prefer addresses for long-tail tokens). Thin low-liquidity tiers can show stale prices — compare across tiers/versions.
 
 ## Pendle (yields)
 
