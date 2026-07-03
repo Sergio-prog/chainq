@@ -213,10 +213,64 @@ def _v4_rows(client, net, address_a: str, address_b: str, fees: list[int], memo:
     return rows
 
 
+def _pool_by_address(client, net, address: str, memo: dict) -> list[dict]:
+    checksummed = Web3.to_checksum_address(address)
+    pool_v3 = client.w3.eth.contract(address=checksummed, abi=uniswap.V3_POOL_ABI)
+    try:
+        sqrt_price = pool_v3.functions.slot0().call()[0]
+        tier = pool_v3.functions.fee().call()
+        token0 = pool_v3.functions.token0().call()
+        token1 = pool_v3.functions.token1().call()
+        sym0, dec0 = _token_info(client, token0, net, memo)
+        sym1, dec1 = _token_info(client, token1, net, memo)
+        return [
+            {
+                "version": "v3",
+                "pool_address": checksummed,
+                "fee_pct": tier / 10000,
+                "pair": f"{sym0}/{sym1}",
+                "price": _sqrt_price(sqrt_price, dec0, dec1),
+                "reserve0": erc20(client, token0).functions.balanceOf(checksummed).call() / 10**dec0,
+                "reserve1": erc20(client, token1).functions.balanceOf(checksummed).call() / 10**dec1,
+                "token0": token0,
+                "token1": token1,
+            }
+        ]
+    except Exception:
+        pass
+    pair = client.w3.eth.contract(address=checksummed, abi=uniswap.V2_PAIR_ABI)
+    try:
+        token0 = pair.functions.token0().call()
+        token1 = pair.functions.token1().call()
+        reserve0_raw, reserve1_raw, _ = pair.functions.getReserves().call()
+        sym0, dec0 = _token_info(client, token0, net, memo)
+        sym1, dec1 = _token_info(client, token1, net, memo)
+        reserve0 = reserve0_raw / 10**dec0
+        reserve1 = reserve1_raw / 10**dec1
+        return [
+            {
+                "version": "v2",
+                "pool_address": checksummed,
+                "fee_pct": 0.3,
+                "pair": f"{sym0}/{sym1}",
+                "price": reserve1 / reserve0 if reserve0 else None,
+                "reserve0": reserve0,
+                "reserve1": reserve1,
+                "token0": token0,
+                "token1": token1,
+            }
+        ]
+    except Exception as exc:
+        raise ChainqError(
+            f"{address} is not a readable Uniswap v2/v3 pool on {net.name} "
+            "(v4 pools have no address — pass the two tokens instead)"
+        ) from exc
+
+
 @app.command()
 def pool(
-    token_a: Annotated[str, typer.Argument(help="token symbol, address, or 'eth' for native (v4)")],
-    token_b: Annotated[str, typer.Argument(help="token symbol, address, or 'eth' for native (v4)")],
+    token_a: Annotated[str, typer.Argument(help="token symbol/address, 'eth' for native (v4), or a pool address alone")],
+    token_b: Annotated[str | None, typer.Argument(help="second token; omit when TOKEN_A is a pool address")] = None,
     network: Annotated[str, typer.Option("--network", "-n", help="network key, alias, or chain id")] = "ethereum",
     version: Annotated[str, typer.Option("--version", "-V", help="v2 | v3 | v4 | all")] = "all",
     fee: Annotated[int | None, typer.Option("--fee", help="fee tier in hundredths of a bip: 100 | 500 | 3000 | 10000")] = None,
@@ -230,6 +284,25 @@ def pool(
     if version not in ("v2", "v3", "v4", "all"):
         raise ChainqError(f"unknown version '{version}' (use: v2 | v3 | v4 | all)")
     net = resolve_network(network)
+    if token_b is None:
+        if not (token_a.startswith("0x") and len(token_a) == 42):
+            raise ChainqError("pass two tokens, or a single 0x pool address")
+        client = connect(net)
+        rows = _pool_by_address(client, net, token_a, {})
+        lines = []
+        for r in rows:
+            sym0, sym1 = r["pair"].split("/")
+            lines.append(
+                f"{r['pair']} {r['fee_pct']}% [{net.key} {r['version']}]: 1 {sym0} = {fmt_amount(r['price'])} {sym1}"
+                f"  reserves {fmt_amount(r['reserve0'])} / {fmt_amount(r['reserve1'])}"
+            )
+        out.emit(
+            rows,
+            lines,
+            quiet_value="\n".join(str(r["price"]) for r in rows),
+            verbose_lines=[f"{r['version']}: {r['pool_address']}  rpc {client.url}" for r in rows],
+        )
+        return
     supported = {
         "v2": net.key in uniswap.V2_FACTORIES,
         "v3": net.key in uniswap.V3_FACTORIES,

@@ -4,12 +4,56 @@ import typer
 
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_pct, fmt_usd, humanize_usd
+from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
-from chainq.providers import coingecko
+from chainq.providers import coingecko, uniswap
+
+SLUG_TO_NETWORK = {slug: key for key, slug in uniswap.CHAIN_SLUGS.items()}
+
+
+def _dexscreener_best_pair(address: str, network_key: str | None) -> dict | None:
+    pairs = [
+        p
+        for p in uniswap.token_pairs(address)
+        if ((p.get("baseToken") or {}).get("address") or "").lower() == address.lower()
+        and (network_key is None or p.get("chainId") == uniswap.CHAIN_SLUGS.get(network_key))
+    ]
+    if not pairs:
+        return None
+    return max(pairs, key=lambda p: (p.get("liquidity") or {}).get("usd") or 0)
+
+
+def _dexscreener_price_row(address: str, best: dict) -> dict:
+    return {
+        "id": None,
+        "symbol": best["baseToken"]["symbol"],
+        "name": best["baseToken"].get("name"),
+        "contract_address": address,
+        "chain": best.get("chainId"),
+        "price_usd": float(best["priceUsd"]) if best.get("priceUsd") else None,
+        "change_24h_pct": (best.get("priceChange") or {}).get("h24"),
+        "market_cap_usd": best.get("marketCap") or best.get("fdv"),
+        "market_cap_rank": None,
+        "volume_24h_usd": (best.get("volume") or {}).get("h24"),
+        "source": "dexscreener",
+    }
+
+
+def _locate_contract(address: str, network_key: str | None) -> tuple[dict | None, dict | None]:
+    best_pair = _dexscreener_best_pair(address, network_key)
+    lookup_key = network_key or (SLUG_TO_NETWORK.get(best_pair.get("chainId")) if best_pair else None)
+    coin = None
+    try:
+        coin = coingecko.by_contract(address, lookup_key) if (lookup_key or best_pair is None) else None
+    except ChainqError:
+        if best_pair is None:
+            raise
+    return coin, best_pair
 
 
 def price(
-    assets: Annotated[list[str], typer.Argument(help="asset symbols or CoinGecko ids, e.g. eth btc hype")],
+    assets: Annotated[list[str], typer.Argument(help="asset symbols, CoinGecko ids, or token contract addresses")],
+    network: Annotated[str | None, typer.Option("--network", "-n", help="network hint for contract addresses")] = None,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -17,10 +61,36 @@ def price(
 ):
     """Spot price, 24h change, and market cap for one or more assets."""
     out = Out(json_out, quiet, verbose, format)
-    ids = [coingecko.resolve_id(a) for a in assets]
-    rows = {m["id"]: m for m in coingecko.markets(ids)}
+    network_key = resolve_network(network).key if network else None
+    entries: list[tuple[str, str | None, dict | None]] = []
+    ids = []
+    for query in assets:
+        if coingecko.is_address(query):
+            coin, best_pair = _locate_contract(query, network_key)
+            if coin:
+                entries.append((query, coin["id"], None))
+                ids.append(coin["id"])
+            elif best_pair is not None:
+                entries.append((query, None, _dexscreener_price_row(query, best_pair)))
+            else:
+                raise ChainqError(f"no asset found for contract {query} on CoinGecko or DexScreener")
+        else:
+            coin_id = coingecko.resolve_id(query)
+            entries.append((query, coin_id, None))
+            ids.append(coin_id)
+    rows = {m["id"]: m for m in coingecko.markets(ids)} if ids else {}
     data, lines, quiet_values, verbose_lines = [], [], [], []
-    for query, coin_id in zip(assets, ids, strict=True):
+    for query, coin_id, fallback in entries:
+        if fallback is not None:
+            data.append(fallback)
+            line = f"{fallback['symbol'].upper()} ({fallback['name']}): {fmt_usd(fallback['price_usd'] or 0)}  " \
+                f"24h {fmt_pct(fallback['change_24h_pct'])}"
+            if fallback.get("market_cap_usd"):
+                line += f"  mcap {humanize_usd(fallback['market_cap_usd'])}"
+            lines.append(line + f"  [dexscreener/{fallback['chain']}]")
+            quiet_values.append(str(fallback["price_usd"]))
+            verbose_lines.append(f"{fallback['symbol'].upper()}: contract {query}, best pair by liquidity [dexscreener]")
+            continue
         m = rows.get(coin_id)
         if m is None:
             raise ChainqError(f"no market data for '{query}' (resolved to '{coin_id}')")
@@ -98,7 +168,8 @@ def trending(
 
 
 def asset(
-    query: Annotated[str, typer.Argument(help="asset symbol or CoinGecko id")],
+    query: Annotated[str, typer.Argument(help="asset symbol, CoinGecko id, or token contract address")],
+    network: Annotated[str | None, typer.Option("--network", "-n", help="network hint for contract addresses")] = None,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -106,8 +177,13 @@ def asset(
 ):
     """Detailed asset profile: price, caps, supply, ATH, links."""
     out = Out(json_out, quiet, verbose, format)
-    coin_id = coingecko.resolve_id(query)
-    c = coingecko.coin(coin_id)
+    if coingecko.is_address(query):
+        network_key = resolve_network(network).key if network else None
+        c, _ = _locate_contract(query, network_key)
+        if c is None:
+            raise ChainqError(f"no CoinGecko asset for contract {query}; `chainq price {query}` falls back to DexScreener")
+    else:
+        c = coingecko.coin(coingecko.resolve_id(query))
     md = c["market_data"]
     price_usd = md["current_price"].get("usd")
     ath = md["ath"].get("usd")

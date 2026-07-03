@@ -66,6 +66,7 @@ Requires Python 3.12+ (the install script bootstraps uv, which handles that for 
 
 ```bash
 chainq price eth btc sol         # spot price, 24h change, market cap
+chainq price 0xTokenAddress      # any token by contract address (DexScreener fallback for long-tail)
 chainq trending                  # trending assets right now
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
@@ -99,6 +100,7 @@ Uniswap and Pendle:
 ```bash
 chainq protocols uniswap pool weth usdc           # onchain pool state: v2+v3+v4, price + reserves per fee tier
 chainq protocols uniswap pool eth usdc -V v4      # native-currency v4 pools; -V v2|v3|v4|all
+chainq protocols uniswap pool 0xPoolAddress       # one pool by address, v2/v3 auto-detected
 chainq protocols uniswap pools "weth usdc"        # pool discovery: price, 24h volume, liquidity, v2/v3/v4
 chainq protocols uniswap stats                    # protocol TVL + volumes
 chainq protocols pendle markets -s implied-apy    # yield markets: implied APY, LP APY, expiry

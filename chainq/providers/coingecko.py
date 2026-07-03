@@ -57,7 +57,7 @@ SYMBOL_TO_ID = {
 }
 
 
-def _get(path: str, params: dict | None = None, ttl: float = 30) -> dict | list:
+def _get(path: str, params: dict | None = None, ttl: float = 30, none_on_404: bool = False) -> dict | list | None:
     key = cache.key_for("coingecko", path, params)
     cached = cache.get(key)
     if cached is not None:
@@ -71,11 +71,60 @@ def _get(path: str, params: dict | None = None, ttl: float = 30) -> dict | list:
         raise ChainqError(f"CoinGecko request failed: {exc}") from exc
     if resp.status_code == 429:
         raise ChainqError("CoinGecko rate limit hit; retry in ~1 minute or set COINGECKO_API_KEY")
+    if resp.status_code == 404 and none_on_404:
+        return None
     if resp.status_code >= 400:
         raise ChainqError(f"CoinGecko returned HTTP {resp.status_code} for {path}")
     result = resp.json()
     cache.put(key, result, ttl)
     return result
+
+
+PLATFORM_IDS = {
+    "ethereum": "ethereum",
+    "arbitrum": "arbitrum-one",
+    "base": "base",
+    "optimism": "optimistic-ethereum",
+    "polygon": "polygon-pos",
+    "bsc": "binance-smart-chain",
+    "avalanche": "avalanche",
+    "gnosis": "xdai",
+    "unichain": "unichain",
+    "linea": "linea",
+    "scroll": "scroll",
+    "zksync": "zksync",
+    "mantle": "mantle",
+    "blast": "blast",
+    "sonic": "sonic",
+    "berachain": "berachain",
+    "worldchain": "world-chain",
+    "ink": "ink",
+    "soneium": "soneium",
+    "celo": "celo",
+    "sei": "sei-v2",
+    "hyperevm": "hyperevm",
+    "monad": "monad",
+    "plasma": "plasma",
+    "katana": "katana",
+}
+
+CONTRACT_LOOKUP_ORDER = ("ethereum", "base", "arbitrum", "bsc", "polygon", "optimism", "avalanche", "hyperevm")
+
+
+def is_address(query: str) -> bool:
+    return query.startswith("0x") and len(query) == 42
+
+
+def by_contract(address: str, network_key: str | None = None) -> dict | None:
+    keys = (network_key,) if network_key else CONTRACT_LOOKUP_ORDER
+    for key in keys:
+        platform = PLATFORM_IDS.get(key)
+        if platform is None:
+            continue
+        result = _get(f"/coins/{platform}/contract/{address.lower()}", ttl=300, none_on_404=True)
+        if result is not None:
+            return result
+    return None
 
 
 def resolve_id(query: str) -> str:

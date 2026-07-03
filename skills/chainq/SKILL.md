@@ -19,10 +19,14 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 
 ```bash
 chainq price eth btc hype          # spot price, 24h change, mcap; accepts symbols or coingecko ids
+chainq price 0xTokenAddress        # by contract address (any chain; -n hints the network)
 chainq trending -l 10              # trending tokens right now
 chainq asset ethena                # full profile: price, mcap/fdv, supply, ATH, links
+chainq asset 0xTokenAddress -n base
 chainq search "sky protocol"       # resolve fuzzy names to ids for price/asset
 ```
+
+Contract addresses work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only).
 
 Prefer `price` for "how much is X"; use `asset` when the user wants depth (supply, FDV, ATH). If a symbol is ambiguous or unknown, run `search` first and use the returned id.
 
@@ -58,6 +62,7 @@ chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy |
 chainq protocols uniswap pool weth usdc -n ethereum      # ONCHAIN pool state, all of v2+v3+v4 per fee tier
 chainq protocols uniswap pool eth usdc -V v4             # 'eth' = native currency (v4 pools use it); -V v2|v3|v4|all
 chainq protocols uniswap pool weth usdc --fee 500        # one fee tier (100 | 500 | 3000 | 10000)
+chainq protocols uniswap pool 0xPoolAddress              # single pool/pair address, v2/v3 auto-detected
 chainq protocols uniswap pools "weth usdc" -n ethereum   # discovery via indexer: 24h vol, liquidity
 chainq protocols uniswap pools usdc -n base -s volume    # all pools for one token; sort: liquidity | volume
 chainq protocols uniswap stats                           # protocol TVL + 24h/7d/30d volume

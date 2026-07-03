@@ -12,12 +12,12 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 - **v0.4** — Uniswap (pools via DexScreener, protocol stats via DefiLlama) and Pendle (active markets, implied/LP APY) under `protocols`.
 - **v0.5** — 25 networks (added linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana); onchain Uniswap v3 `pool` command (factory + slot0); Lighter perps (markets, price, funding, positions); Hyperliquid HIP-3 builder dexs (`hl dexs`, `--dex`) and HIP-4 outcome markets (`hl outcomes`); skill install via `npx skills add`.
 - **v0.6** — onchain Uniswap `pool` covers v2 + v3 + v4 (v2 pairs via getReserves, v4 via StateView + computed poolId, native-currency support with `eth`).
+- **v0.7** — address-based discovery: `price`/`asset` accept token contract addresses (DexScreener locates the chain → CoinGecko contract lookup → DexScreener price fallback for long-tail tokens); `uniswap pool` accepts a bare pool address with v2/v3 auto-detection.
 
 ## Next
 
 - **NFTs** — OpenSea collection floors, stats, top collections (API key support already wired).
 - **Stablecoin protocols** — Sky (savings rate), Ethena (sUSDe yield, backing), stablecoin mcap overview.
-- **Long-tail token prices** — DexScreener fallback when CoinGecko misses (provider code exists in PriceAlerts).
 - **Portfolio** — one command sweeping native + known tokens across all networks for an address, totals in USD.
 - **PyPI release** — then Homebrew tap; install.sh switches to PyPI as default source.
 
