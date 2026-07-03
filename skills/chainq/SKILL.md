@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, Aave v3 lending markets (supply/borrow APY), Uniswap pools (onchain + indexed) and protocol stats, Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, and Lighter perps. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, DEX pools, yields, funding rates, prediction markets, Hyperliquid, or Lighter.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, Lighter perps, and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, Hyperliquid, or Lighter.
 ---
 
 # chainq
