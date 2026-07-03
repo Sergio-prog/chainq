@@ -16,12 +16,14 @@ say() { printf '%s\n' "$*"; }
 
 install_with_uv() {
   say "${DIM}==> Installing chainq with uv${RESET}"
-  uv tool install -q --force --from "git+${REPO_URL}" chainq
+  uv tool install -q --force chainq 2>/dev/null \
+    || uv tool install -q --force --from "git+${REPO_URL}" chainq
 }
 
 install_with_pipx() {
   say "${DIM}==> Installing chainq with pipx${RESET}"
-  pipx install --force "git+${REPO_URL}" >/dev/null
+  pipx install --force chainq >/dev/null 2>&1 \
+    || pipx install --force "git+${REPO_URL}" >/dev/null
 }
 
 bootstrap_uv() {

@@ -5,6 +5,17 @@ description = "Agent-friendly CLI for onchain and crypto market data: balances, 
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
+keywords = ["crypto", "cli", "web3", "ethereum", "defi", "blockchain", "agents", "onchain"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Utilities",
+]
 dependencies = [
     "httpx>=0.27",
     "pydantic-settings>=2.6",
@@ -20,6 +31,8 @@ dev = [
 
 [project.urls]
 Repository = "https://github.com/Sergio-prog/chainq"
+Issues = "https://github.com/Sergio-prog/chainq/issues"
+Roadmap = "https://github.com/Sergio-prog/chainq/blob/main/ROADMAP.md"
 
 [project.scripts]
 chainq = "chainq.cli:run"

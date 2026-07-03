@@ -20,7 +20,7 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 
 ## Next
 
-- **PyPI release** — then Homebrew tap; install.sh switches to PyPI as default source.
+- **PyPI release** — release workflow (tag-triggered, trusted publishing) and PyPI-first install.sh are in place; owner must add a PyPI trusted publisher (project `chainq`, repo `Sergio-prog/chainq`, workflow `release.yml`, environment `pypi`) and push a `v*` tag. Then a Homebrew tap.
 
 ## Later
 
