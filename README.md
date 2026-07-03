@@ -68,6 +68,7 @@ Requires Python 3.12+ (the install script bootstraps uv, which handles that for 
 chainq price eth btc sol         # spot price, 24h change, market cap
 chainq price 0xTokenAddress      # any token by contract address (DexScreener fallback for long-tail)
 chainq trending                  # trending assets right now
+chainq stables                   # stablecoins by mcap: peg price, supply changes, mechanism
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
@@ -104,6 +105,13 @@ chainq protocols uniswap pool 0xPoolAddress       # one pool by address, v2/v3 a
 chainq protocols uniswap pools "weth usdc"        # pool discovery: price, 24h volume, liquidity, v2/v3/v4
 chainq protocols uniswap stats                    # protocol TVL + volumes
 chainq protocols pendle markets -s implied-apy    # yield markets: implied APY, LP APY, expiry
+```
+
+Sky and Ethena:
+
+```bash
+chainq protocols sky rate                         # Sky Savings Rate (sUSDS) + legacy DSR, onchain
+chainq protocols ethena yield                     # sUSDe APY, protocol yield, USDe supply/peg
 ```
 
 Hyperliquid (public data, incl. HIP-3 builder dexs and HIP-4 outcome markets):

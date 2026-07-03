@@ -4,6 +4,7 @@ from chainq import cache, http
 from chainq.errors import ChainqError
 
 BASE_URL = "https://api.llama.fi"
+STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins"
 
 
 def _fetch(url: str, params: dict | None = None) -> dict | list:
@@ -60,6 +61,34 @@ def find_protocol(query: str) -> dict | None:
     if matches:
         return max(matches, key=lambda p: p["tvl_usd"] or 0)
     return None
+
+
+def _circulating(asset: dict, field: str) -> float | None:
+    return (asset.get(field) or {}).get(asset.get("pegType"))
+
+
+def stablecoins() -> list[dict]:
+    key = cache.key_for("llama-stablecoins")
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    rows = [
+        {
+            "symbol": asset.get("symbol"),
+            "name": asset.get("name"),
+            "gecko_id": asset.get("gecko_id"),
+            "peg_type": asset.get("pegType"),
+            "mechanism": asset.get("pegMechanism"),
+            "price_usd": asset.get("price"),
+            "mcap_usd": _circulating(asset, "circulating"),
+            "mcap_prev_day_usd": _circulating(asset, "circulatingPrevDay"),
+            "mcap_prev_week_usd": _circulating(asset, "circulatingPrevWeek"),
+            "mcap_prev_month_usd": _circulating(asset, "circulatingPrevMonth"),
+        }
+        for asset in _fetch(STABLECOINS_URL, {"includePrices": "true"}).get("peggedAssets") or []
+    ]
+    cache.put(key, rows, ttl=300)
+    return rows
 
 
 def chains() -> list[dict]:

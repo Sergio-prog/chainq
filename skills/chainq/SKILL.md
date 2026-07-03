@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, Lighter perps, NFT collection floors and stats (OpenSea), and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, NFT floor prices, Hyperliquid, or Lighter.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, Lighter perps, NFT collection floors and stats (OpenSea), stablecoin market caps and pegs, Sky savings rate, Ethena sUSDe yield, and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, NFT floor prices, stablecoins, Hyperliquid, or Lighter.
 ---
 
 # chainq
@@ -28,6 +28,18 @@ chainq search "sky protocol"       # resolve fuzzy names to ids for price/asset
 ```
 
 Contract addresses work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only).
+
+## Stablecoins
+
+```bash
+chainq stables                             # ranked by mcap: peg price, 7d supply change, mechanism
+chainq stables usde                        # one stablecoin (or filter by name)
+chainq stables -m crypto-backed            # filter: fiat-backed | crypto-backed | algorithmic
+chainq protocols sky rate                  # Sky Savings Rate (sUSDS) + legacy DSR, read onchain
+chainq protocols ethena yield              # sUSDe APY (current + 30d/90d avg), USDe supply and peg
+```
+
+Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 1.0. "Where to park stables" questions: compare `sky rate`, `ethena yield`, and lending APYs from aave/morpho.
 
 Prefer `price` for "how much is X"; use `asset` when the user wants depth (supply, FDV, ATH). If a symbol is ambiguous or unknown, run `search` first and use the returned id.
 

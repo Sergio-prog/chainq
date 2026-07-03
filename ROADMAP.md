@@ -15,10 +15,10 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 - **v0.7** — address-based discovery: `price`/`asset` accept token contract addresses (DexScreener locates the chain → CoinGecko contract lookup → DexScreener price fallback for long-tail tokens); `uniswap pool` accepts a bare pool address with v2/v3 auto-detection.
 - **v0.8** — Morpho (markets + vaults via official GraphQL API); DefiLlama adapter (`llama protocol/top/chains` for any protocol); `chainq config` command; HTTP retry with backoff on all providers; parallel RPC endpoint racing; shell completions.
 - **v0.9** — NFTs via OpenSea (`nft floor/collection/top`): floors with USD conversion, volumes, owners, supply; keyless for well-known collections, API key unlocks `top` and long-tail slugs.
+- **v0.10** — stablecoins: `stables` overview (mcap ranking, peg price, supply changes via DefiLlama stablecoins API), `sky rate` (SSR + legacy DSR read onchain), `ethena yield` (sUSDe APY via official API, USDe supply/peg).
 
 ## Next
 
-- **Stablecoin protocols** — Sky (savings rate), Ethena (sUSDe yield, backing), stablecoin mcap overview.
 - **Portfolio** — one command sweeping native + known tokens across all networks for an address, totals in USD.
 - **PyPI release** — then Homebrew tap; install.sh switches to PyPI as default source.
 
