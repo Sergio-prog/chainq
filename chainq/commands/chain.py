@@ -10,7 +10,7 @@ from web3.types import RPCEndpoint
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_gwei, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
-from chainq.output import JsonOpt, Out, QuietOpt, VerboseOpt
+from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko
 from chainq.rpc import connect, erc20, resolve_address
 from chainq.tokens import resolve_token
@@ -18,9 +18,11 @@ from chainq.tokens import resolve_token
 NetworkOpt = Annotated[str, typer.Option("--network", "-n", help="network key, alias, or chain id")]
 
 
-def networks(json_out: JsonOpt = False, quiet: QuietOpt = False, verbose: VerboseOpt = False):
+def networks(
+    json_out: JsonOpt = False, quiet: QuietOpt = False, verbose: VerboseOpt = False, format: FormatOpt = "text"
+):
     """List supported networks with chain ids and aliases."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     data = [
         {
             "key": net.key,
@@ -49,9 +51,10 @@ def balance(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Get native or ERC-20 token balance of an address."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
     addr = resolve_address(address)
     client = connect(net)
@@ -103,9 +106,10 @@ def gas(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Current gas price, base fee, and estimated native-transfer cost in USD."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
     client = connect(net)
     gas_price = client.w3.eth.gas_price
@@ -145,9 +149,10 @@ def tx(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Look up a transaction: status, parties, value, fee, block."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
     client = connect(net)
     try:

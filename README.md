@@ -13,10 +13,13 @@ HYPE (Hyperliquid): $65.79  24h +4.38%  mcap $14.63B
 $ chainq balance vitalik.eth
 vitalik.eth (0xd8dA…6045) on Ethereum: 5.6955 ETH (~$9,635.87)
 
-$ chainq hl funding --limit 3
-ME-PERP funding: -0.1713%/h (-1500.8% APR)  mark $0.0681  OI $371.51K
-CELO-PERP funding: -0.0272%/h (-238.2% APR)  mark $0.061639  OI $146.98K
-STABLE-PERP funding: -0.0162%/h (-142.3% APR)  mark $0.03519  OI $2.29M
+$ chainq protocols aave markets -n base --format table -l 3
+network: base
+market  symbol  supply_apy_pct  borrow_apy_pct    supplied_usd  utilization_pct
+------  ------  --------------  --------------  --------------  ---------------
+Base    USDC            3.1684          4.2507  176,010,037.57          83.2569
+Base    WETH            1.5411          2.2608  160,504,459.31          80.4814
+Base    cbBTC           0.0149          0.7126  144,452,332.80           4.2015
 ```
 
 ## Why
@@ -27,6 +30,8 @@ Agents are terrible at juggling five different APIs, auth schemes, and SDKs — 
 |---|---|---|
 | human | *(default)* | one readable line per result |
 | machine | `--json` | structured JSON for parsing |
+| table | `--format table` | aligned columns for humans scanning lists |
+| toon | `--format toon` | compact tabular text — fewer tokens than JSON for LLM contexts |
 | pipe | `-q` | bare primary value only |
 
 Plus `-v` for provenance (RPC endpoint used, data source, explorer links). Errors go to stderr with exit code 1. Responses are cached briefly (30–60s) so repeated queries stay fast and under rate limits.
@@ -61,6 +66,7 @@ Requires Python 3.12+ (the install script bootstraps uv, which handles that for 
 
 ```bash
 chainq price eth btc sol         # spot price, 24h change, market cap
+chainq trending                  # trending assets right now
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
@@ -78,21 +84,26 @@ chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatc
 
 Networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`.
 
-### Aave v3
+### Protocols
+
+Aave v3:
 
 ```bash
-chainq aave markets -n ethereum                # reserves: supply/borrow APY, size, utilization
-chainq aave markets -c usdc -n base            # one asset across markets
-chainq aave markets -s borrow-apy -l 10        # sort: supplied | supply-apy | borrow-apy | utilization
+chainq protocols aave markets -n ethereum         # reserves: supply/borrow APY, size, utilization
+chainq protocols aave markets -c usdc -n base     # one asset across markets
+chainq protocols aave markets -s borrow-apy       # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
-### Hyperliquid (perps, public data)
+Hyperliquid (public data):
 
 ```bash
-chainq hl price BTC ETH          # mark/oracle price, 24h change, volume, OI, funding
-chainq hl markets -s oi          # top markets by volume | oi | funding | change
-chainq hl funding                # most extreme funding rates (hourly + APR)
-chainq hl positions 0xADDRESS    # account value, margin, open positions with PnL
+chainq protocols hl price BTC ETH                 # perps: mark price, 24h change, volume, OI, funding
+chainq protocols hl markets -s oi                 # top perp markets by volume | oi | funding | change
+chainq protocols hl funding                       # most extreme funding rates (hourly + APR)
+chainq protocols hl positions 0xADDRESS           # perp account: value, margin, positions with PnL
+chainq protocols hl spot price HYPE               # spot pairs: price, 24h change, volume, mcap
+chainq protocols hl spot markets                  # top spot markets by volume
+chainq protocols hl spot balances 0xADDRESS       # spot token balances with USD values
 ```
 
 ## Configuration

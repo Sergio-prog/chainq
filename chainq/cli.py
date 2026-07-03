@@ -4,7 +4,7 @@ import httpx
 import typer
 
 from chainq import __version__, update
-from chainq.commands import aave, chain, hl, market
+from chainq.commands import chain, market, protocols
 from chainq.errors import ChainqError
 
 app = typer.Typer(
@@ -23,9 +23,9 @@ app.command()(chain.rpc)
 app.command()(market.price)
 app.command()(market.asset)
 app.command()(market.search)
+app.command()(market.trending)
 app.command()(update.update)
-app.add_typer(hl.app, name="hl")
-app.add_typer(aave.app, name="aave")
+app.add_typer(protocols.app, name="protocols")
 
 
 @app.command()

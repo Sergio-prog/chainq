@@ -5,7 +5,7 @@ import typer
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_pct, humanize_usd
 from chainq.networks import resolve_network
-from chainq.output import JsonOpt, Out, QuietOpt, VerboseOpt
+from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import aave
 
 app = typer.Typer(no_args_is_help=True, help="Aave v3 protocol data (lending markets).")
@@ -57,9 +57,10 @@ def markets(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Aave v3 reserves on a network: supply/borrow APY, size, utilization."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     if sort not in SORT_KEYS:
         raise ChainqError(f"unknown sort '{sort}' (use: {', '.join(SORT_KEYS)})")
     net = resolve_network(network)

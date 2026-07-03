@@ -4,7 +4,7 @@ import typer
 
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_pct, fmt_usd, humanize_usd
-from chainq.output import JsonOpt, Out, QuietOpt, VerboseOpt
+from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko
 
 
@@ -13,9 +13,10 @@ def price(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Spot price, 24h change, and market cap for one or more assets."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     ids = [coingecko.resolve_id(a) for a in assets]
     rows = {m["id"]: m for m in coingecko.markets(ids)}
     data, lines, quiet_values, verbose_lines = [], [], [], []
@@ -51,14 +52,60 @@ def price(
     out.emit(data, lines, quiet_value="\n".join(quiet_values), verbose_lines=verbose_lines)
 
 
+def _money(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(str(value).replace("$", "").replace(",", ""))
+    except ValueError:
+        return None
+
+
+def trending(
+    limit: Annotated[int, typer.Option("--limit", "-l")] = 10,
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Trending assets on CoinGecko right now."""
+    out = Out(json_out, quiet, verbose, format)
+    rows = []
+    for entry in coingecko.trending()[:limit]:
+        item = entry["item"]
+        d = item.get("data") or {}
+        rows.append(
+            {
+                "id": item["id"],
+                "symbol": item["symbol"],
+                "name": item["name"],
+                "market_cap_rank": item.get("market_cap_rank"),
+                "price_usd": _money(d.get("price")),
+                "change_24h_pct": (d.get("price_change_percentage_24h") or {}).get("usd"),
+                "market_cap_usd": _money(d.get("market_cap")),
+                "volume_24h_usd": _money(d.get("total_volume")),
+                "source": "coingecko",
+            }
+        )
+    lines = [
+        f"{i}. {r['symbol'].upper()} ({r['name']}): "
+        + (fmt_usd(r["price_usd"]) if r["price_usd"] is not None else "n/a")
+        + f"  24h {fmt_pct(r['change_24h_pct'])}"
+        + (f"  mcap {humanize_usd(r['market_cap_usd'])}" if r["market_cap_usd"] else "")
+        for i, r in enumerate(rows, start=1)
+    ]
+    out.emit(rows, lines, quiet_value="\n".join(r["id"] for r in rows))
+
+
 def asset(
     query: Annotated[str, typer.Argument(help="asset symbol or CoinGecko id")],
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Detailed asset profile: price, caps, supply, ATH, links."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     coin_id = coingecko.resolve_id(query)
     c = coingecko.coin(coin_id)
     md = c["market_data"]
@@ -116,9 +163,10 @@ def search(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Search assets on CoinGecko; returns ids usable in price/asset commands."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     coins = coingecko.search(query)[:limit]
     if not coins:
         raise ChainqError(f"no assets found for '{query}'")

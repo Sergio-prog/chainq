@@ -116,6 +116,10 @@ def search(query: str) -> list[dict]:
     return _get("/search", {"query": query}, ttl=3600)["coins"]
 
 
+def trending() -> list[dict]:
+    return _get("/search/trending", ttl=300)["coins"]
+
+
 def simple_price(ids: list[str]) -> dict:
     return _get("/simple/price", {"ids": ",".join(ids), "vs_currencies": "usd"})
 

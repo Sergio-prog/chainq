@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, Aave v3 lending markets (supply/borrow APY), and Hyperliquid perp markets, funding rates, and account positions. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, or Hyperliquid.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 9 networks, Aave v3 lending markets (supply/borrow APY), and Hyperliquid perps and spot (prices, funding, positions, balances). Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, or Hyperliquid.
 ---
 
 # chainq
@@ -12,12 +12,14 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 - Default output is one human-readable line per result — safe to show the user as-is.
 - Add `--json` to any command for structured output you need to parse or compute over.
 - Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
+- `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
 - Errors: stderr + exit code 1. A CoinGecko rate-limit error means wait ~1 minute (or set `COINGECKO_API_KEY`); RPC commands are not affected by it.
 
 ## Market data (CoinGecko)
 
 ```bash
 chainq price eth btc hype          # spot price, 24h change, mcap; accepts symbols or coingecko ids
+chainq trending -l 10              # trending tokens right now
 chainq asset ethena                # full profile: price, mcap/fdv, supply, ATH, links
 chainq search "sky protocol"       # resolve fuzzy names to ids for price/asset
 ```
@@ -43,21 +45,24 @@ Known token symbols per network are listed in the `balance` error message if a s
 ## Aave v3 (lending)
 
 ```bash
-chainq aave markets -n ethereum        # reserves ranked by size: supply/borrow APY, utilization
-chainq aave markets -c usdc -n base    # one asset (all markets on the chain)
-chainq aave markets -s supply-apy      # sort: supplied | supply-apy | borrow-apy | utilization
+chainq protocols aave markets -n ethereum        # reserves ranked by size: supply/borrow APY, utilization
+chainq protocols aave markets -c usdc -n base    # one asset (all markets on the chain)
+chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
-"Best yield on USDC" type questions: run `aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
+"Best yield on USDC" type questions: run `protocols aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
 
-## Hyperliquid (public data, perps)
+## Hyperliquid (public data)
 
 ```bash
-chainq hl price BTC ETH            # mark/oracle price, 24h change, volume, OI, funding
-chainq hl markets -l 10 -s oi      # top markets; sort: volume | oi | funding | change
-chainq hl funding                  # most extreme funding rates (hourly % and APR)
-chainq hl funding BTC ETH          # funding for specific coins
-chainq hl positions 0xADDRESS      # account value, margin, open positions with PnL/liq price
+chainq protocols hl price BTC ETH            # perps: mark/oracle price, 24h change, volume, OI, funding
+chainq protocols hl markets -l 10 -s oi      # top perp markets; sort: volume | oi | funding | change
+chainq protocols hl funding                  # most extreme funding rates (hourly % and APR)
+chainq protocols hl funding BTC ETH          # funding for specific coins
+chainq protocols hl positions 0xADDRESS      # perp account value, margin, positions with PnL/liq price
+chainq protocols hl spot price HYPE PURR     # spot pairs: price, 24h change, volume, mcap
+chainq protocols hl spot markets -l 10       # top spot markets by volume
+chainq protocols hl spot balances 0xADDRESS  # spot token balances with USD values
 ```
 
 Funding is shown as hourly rate and annualized APR; negative funding means shorts pay longs.

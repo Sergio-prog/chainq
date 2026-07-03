@@ -4,11 +4,13 @@ import typer
 
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
-from chainq.output import JsonOpt, Out, QuietOpt, VerboseOpt
+from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import hyperliquid
 from chainq.rpc import resolve_address
 
-app = typer.Typer(no_args_is_help=True, help="Hyperliquid public market data (perps).")
+app = typer.Typer(no_args_is_help=True, help="Hyperliquid public market data (perps and spot).")
+spot_app = typer.Typer(no_args_is_help=True, help="Hyperliquid spot markets and balances.")
+app.add_typer(spot_app, name="spot")
 
 
 def _market_line(m: dict) -> str:
@@ -36,9 +38,10 @@ def price(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Mark price, 24h change, volume, OI, and funding for perp markets."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     selected = _find(hyperliquid.perp_markets(), coins)
     out.emit(
         selected,
@@ -59,9 +62,10 @@ def markets(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Top perp markets ranked by volume, OI, funding, or 24h change."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     keys = {
         "volume": lambda m: m["volume_24h_usd"],
         "oi": lambda m: m["open_interest_usd"],
@@ -85,9 +89,10 @@ def funding(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Current hourly funding rates and annualized APR."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     all_markets = hyperliquid.perp_markets()
     if coins:
         selected = _find(all_markets, coins)
@@ -107,9 +112,10 @@ def positions(
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
 ):
     """Open perp positions and margin summary for an account."""
-    out = Out(json_out, quiet, verbose)
+    out = Out(json_out, quiet, verbose, format)
     addr = resolve_address(address)
     state = hyperliquid.clearinghouse_state(addr)
     summary = state.get("marginSummary") or {}
@@ -159,3 +165,114 @@ def positions(
         "positions": positions_data,
     }
     out.emit(data, lines, quiet_value=account_value)
+
+
+def _spot_line(m: dict) -> str:
+    mcap = f"  mcap {humanize_usd(m['market_cap_usd'])}" if m["market_cap_usd"] else ""
+    price = m["mid_price"] or m["mark_price"]
+    return (
+        f"{m['pair']} (spot): {fmt_usd(price) if price else 'n/a'}  24h {fmt_pct(m['change_24h_pct'])}  "
+        f"vol {humanize_usd(m['volume_24h_usd'])}{mcap}"
+    )
+
+
+def _find_spot(markets: list[dict], coins: list[str]) -> list[dict]:
+    ranked = sorted(markets, key=lambda m: not m["canonical"])
+    selected = []
+    for coin in coins:
+        needle = coin.upper()
+        match = next(
+            (m for m in ranked if needle in ((m["pair"] or "").upper(), (m["base"] or "").upper(), m["hl_name"].upper())),
+            None,
+        )
+        if match is None:
+            raise ChainqError(f"no Hyperliquid spot market for '{coin}'")
+        selected.append(match)
+    return selected
+
+
+@spot_app.command(name="price")
+def spot_price(
+    coins: Annotated[list[str], typer.Argument(help="spot tokens or pairs, e.g. HYPE PURR/USDC")],
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Spot price, 24h change, volume, and market cap for spot pairs."""
+    out = Out(json_out, quiet, verbose, format)
+    selected = _find_spot(hyperliquid.spot_markets(), coins)
+    out.emit(
+        selected,
+        [_spot_line(m) for m in selected],
+        quiet_value="\n".join(str(m["mid_price"] or m["mark_price"]) for m in selected),
+        verbose_lines=[
+            f"{m['pair']}: mark {fmt_usd(m['mark_price']) if m['mark_price'] else 'n/a'}, "
+            f"circulating {fmt_amount(m['circulating_supply']) if m['circulating_supply'] else 'n/a'} {m['base']}, "
+            f"hl name {m['hl_name']}"
+            for m in selected
+        ],
+    )
+
+
+@spot_app.command(name="markets")
+def spot_markets(
+    limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Top spot markets by 24h volume."""
+    out = Out(json_out, quiet, verbose, format)
+    ranked = sorted(hyperliquid.spot_markets(), key=lambda m: m["volume_24h_usd"], reverse=True)[:limit]
+    out.emit(ranked, [_spot_line(m) for m in ranked], quiet_value="\n".join(m["pair"] for m in ranked))
+
+
+@spot_app.command(name="balances")
+def spot_balances(
+    address: Annotated[str, typer.Argument(help="account address (0x...)")],
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Spot token balances (with USD values) for an account."""
+    out = Out(json_out, quiet, verbose, format)
+    addr = resolve_address(address)
+    balances = hyperliquid.spot_balances(addr)
+    prices: dict[str, float] = {"USDC": 1.0}
+    ranked = sorted(hyperliquid.spot_markets(), key=lambda m: (m["canonical"], m["volume_24h_usd"]))
+    for m in ranked:
+        price = m["mid_price"] or m["mark_price"]
+        if m["base"] and price:
+            prices[m["base"]] = price
+    rows = []
+    for b in balances:
+        total = float(b.get("total") or 0)
+        if total == 0:
+            continue
+        price = prices.get(b.get("coin"))
+        rows.append(
+            {
+                "coin": b.get("coin"),
+                "total": total,
+                "hold": float(b.get("hold") or 0),
+                "price_usd": price,
+                "value_usd": total * price if price is not None else None,
+            }
+        )
+    rows.sort(key=lambda r: r["value_usd"] or 0, reverse=True)
+    total_usd = sum(r["value_usd"] or 0 for r in rows)
+    lines = [f"HL spot balances {short_addr(addr)}: ~{fmt_usd(total_usd)} across {len(rows)} tokens"]
+    lines.extend(
+        f"  {r['coin']}: {fmt_amount(r['total'])}" + (f" (~{fmt_usd(r['value_usd'])})" if r["value_usd"] is not None else "")
+        for r in rows
+    )
+    if not rows:
+        lines.append("  no spot balances")
+    out.emit(
+        {"address": addr, "total_value_usd": total_usd, "balances": rows},
+        lines,
+        quiet_value=total_usd,
+    )
