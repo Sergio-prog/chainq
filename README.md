@@ -50,12 +50,6 @@ Homebrew:
 brew install sergio-prog/tap/chainq
 ```
 
-No install at all — via npx (needs [uv](https://docs.astral.sh/uv/) or pipx on PATH):
-
-```bash
-npx chainq price eth btc
-```
-
 Or directly with uv / pipx:
 
 ```bash

@@ -29,4 +29,4 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 
 - `ROADMAP.md` — vision, shipped versions, what to build next.
 - `skills/chainq/SKILL.md` — the agent skill, primary distribution channel; update on any command change.
-- `install.sh` — public installer (uv/pipx from git; switch to PyPI after publishing).
+- `install.sh` — public installer (PyPI-first via uv/pipx, git fallback).
