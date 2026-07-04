@@ -11,7 +11,7 @@ class Chainq < Formula
 
   def install
     virtualenv_create(libexec, "python3.12")
-    system libexec/"bin/pip", "install", "--quiet", buildpath
+    system libexec/"bin/python", "-m", "pip", "install", "--quiet", buildpath
     bin.install_symlink libexec/"bin/chainq"
   end
 
