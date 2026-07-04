@@ -1,0 +1,30 @@
+{
+  "name": "chainq",
+  "version": "0.11.0",
+  "description": "Agent-friendly CLI for onchain and crypto market data — npm launcher for the Python CLI (runs via uv)",
+  "bin": {
+    "chainq": "bin/chainq.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sergio-prog/chainq.git"
+  },
+  "homepage": "https://github.com/Sergio-prog/chainq#readme",
+  "keywords": [
+    "crypto",
+    "cli",
+    "web3",
+    "ethereum",
+    "defi",
+    "blockchain",
+    "agents",
+    "onchain"
+  ]
+}

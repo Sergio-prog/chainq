@@ -20,7 +20,7 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 
 ## Next
 
-- **PyPI release** — release workflow (tag-triggered, trusted publishing) and PyPI-first install.sh are in place; owner must add a PyPI trusted publisher (project `chainq`, repo `Sergio-prog/chainq`, workflow `release.yml`, environment `pypi`) and push a `v*` tag. Then a Homebrew tap.
+- **Release channels** — tag-triggered release workflow publishes to PyPI (trusted publishing), npm (`npx chainq` launcher running the pinned Python CLI via uvx), and bumps the Homebrew formula in [Sergio-prog/homebrew-tap](https://github.com/Sergio-prog/homebrew-tap) (needs `TAP_GITHUB_TOKEN` secret). One-time owner setup: PyPI pending trusted publisher, first `npm publish`, tap PAT.
 - **Historical data** — `candles <asset> --days 30` (CoinGecko OHLC), `price <asset> --at 2025-01-01`, Hyperliquid funding history (`fundingHistory` info endpoint). Agents constantly want "price N days ago" and can't get it today.
 - **Portfolio depth** — fold Hyperliquid perp/spot balances (providers already exist) and Aave/Morpho supplied positions into `portfolio` behind a `--defi` flag; auto token lists per network from CoinGecko (top ~50 by mcap, cached daily) so the sweep catches far more than the curated registry.
 - **Gas across all networks** — `gas --all`: one parallel sweep (reuse the portfolio executor) answering "where is it cheapest to transact right now".

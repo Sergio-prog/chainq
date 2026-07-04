@@ -34,3 +34,48 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+
+  npm:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest
+      - run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+        working-directory: npm
+      - run: npm publish
+        working-directory: npm
+
+  homebrew:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for PyPI to serve the release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for _ in $(seq 1 30); do
+            curl -fsS "https://pypi.org/pypi/chainq/$VERSION/json" >/dev/null && exit 0
+            sleep 10
+          done
+          echo "PyPI never served chainq $VERSION" >&2
+          exit 1
+      - name: Bump tap formula
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Sergio-prog/homebrew-tap.git" tap
+          python3 scripts/update_tap_formula.py "$VERSION" tap/Formula/chainq.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/chainq.rb
+          git commit -m "chainq $VERSION"
+          git push

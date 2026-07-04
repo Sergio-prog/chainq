@@ -44,11 +44,23 @@ One-liner:
 curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh
 ```
 
-Or directly with [uv](https://docs.astral.sh/uv/) / pipx:
+Homebrew:
 
 ```bash
-uv tool install --from git+https://github.com/Sergio-prog/chainq chainq
-pipx install git+https://github.com/Sergio-prog/chainq
+brew install sergio-prog/tap/chainq
+```
+
+No install at all — via npx (needs [uv](https://docs.astral.sh/uv/) or pipx on PATH):
+
+```bash
+npx chainq price eth btc
+```
+
+Or directly with uv / pipx:
+
+```bash
+uv tool install chainq
+pipx install chainq
 ```
 
 From source:

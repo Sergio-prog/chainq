@@ -1,0 +1,21 @@
+class Chainq < Formula
+  include Language::Python::Virtualenv
+
+  desc "Agent-friendly CLI for onchain and crypto market data"
+  homepage "https://github.com/Sergio-prog/chainq"
+  url "{{URL}}"
+  sha256 "{{SHA256}}"
+  license "MIT"
+
+  depends_on "python@3.12"
+
+  def install
+    virtualenv_create(libexec, "python3.12")
+    system libexec/"bin/pip", "install", "--quiet", buildpath
+    bin.install_symlink libexec/"bin/chainq"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/chainq version")
+  end
+end
