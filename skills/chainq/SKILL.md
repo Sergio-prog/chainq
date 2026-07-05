@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - asset prices, trending tokens and market caps (CoinGecko), wallet balances (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets, Lighter perps, NFT collection floors and stats (OpenSea), stablecoin market caps and pegs, Sky savings rate, Ethena sUSDe yield, and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, NFT floor prices, stablecoins, Hyperliquid, or Lighter.
+description: Query live crypto and onchain data via the chainq CLI - asset prices, historical prices and OHLC candles, trending tokens and market caps (CoinGecko), wallet balances and cross-chain portfolios (native + ERC-20, ENS supported), gas prices, transaction lookups, raw EVM JSON-RPC on 25 networks, lending markets on Aave v3 and Morpho (supply/borrow APY, vaults), Uniswap pools (onchain + indexed), Pendle yield markets (implied APY), Hyperliquid perps/spot/builder-dexs/prediction-markets and funding history, Lighter perps, NFT collection floors and stats (OpenSea), stablecoin market caps and pegs, Sky savings rate, Ethena sUSDe yield, Lido stETH staking APR, Aerodrome (Base DEX) TVL and pools, and DefiLlama metrics (TVL/fees/volume) for any protocol or chain. Use whenever the user asks about crypto prices, a price N days ago, price history/candles, token/wallet balances, gas costs, a transaction hash, onchain state, lending/borrowing rates, vault yields, DEX pools, TVL, funding rates, prediction markets, NFT floor prices, stablecoins, staking yields, Hyperliquid, or Lighter.
 ---
 
 # chainq
@@ -13,7 +13,7 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 - Add `--json` to any command for structured output you need to parse or compute over.
 - Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
 - `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
-- Errors: stderr + exit code 1. A CoinGecko rate-limit error means wait ~1 minute (or `chainq config set coingecko-api-key <key>`); RPC commands are not affected by it.
+- Errors: stderr + exit code 1. In `--json`/`--format json` mode the error is instead printed to stdout as `{"error": "..."}` (still exit 1) so you can branch on it without reading stderr. A CoinGecko rate-limit error means wait ~1 minute (or `chainq config set coingecko-api-key <key>`); RPC commands are not affected by it.
 - Persistent settings (API keys, custom RPCs, timeouts): `chainq config set/get/list/unset` — no manual .env editing needed.
 
 ## Market data (CoinGecko)
@@ -25,9 +25,12 @@ chainq trending -l 10              # trending tokens right now
 chainq asset ethena                # full profile: price, mcap/fdv, supply, ATH, links
 chainq asset 0xTokenAddress -n base
 chainq search "sky protocol"       # resolve fuzzy names to ids for price/asset
+chainq price btc eth --at 2025-03-01  # historical price on a date (within the last 365 days)
+chainq candles btc --days 30          # OHLC candles; granularity auto-scales (30d → 4h candles)
+chainq candles eth -d 7 -l 24 --json  # last 24 candles as JSON; -d window, -l caps rows shown
 ```
 
-Contract addresses work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only).
+Contract addresses work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only). Historical `--at`/`candles` need a CoinGecko-listed asset (symbol, id, or contract), and the public API only covers the last 365 days.
 
 ## Stablecoins
 
@@ -35,8 +38,10 @@ Contract addresses work everywhere: `price`/`asset` locate the token via DexScre
 chainq stables                             # ranked by mcap: peg price, 7d supply change, mechanism
 chainq stables usde                        # one stablecoin (or filter by name)
 chainq stables -m crypto-backed            # filter: fiat-backed | crypto-backed | algorithmic
+chainq stables --min-mcap 1000000000       # hide stablecoins below a market cap floor
 chainq protocols sky rate                  # Sky Savings Rate (sUSDS) + legacy DSR, read onchain
 chainq protocols ethena yield              # sUSDe APY (current + 30d/90d avg), USDe supply and peg
+chainq protocols lido apr                  # stETH staking APR (7d SMA), TVL, wstETH/stETH rate
 ```
 
 Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 1.0. "Where to park stables" questions: compare `sky rate`, `ethena yield`, and lending APYs from aave/morpho.
@@ -50,7 +55,9 @@ Prefer `price` for "how much is X"; use `asset` when the user wants depth (suppl
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
 chainq portfolio vitalik.eth                                  # sweep ALL networks: native + known tokens, USD total
-chainq portfolio 0x... -n ethereum -n base --min-usd 1        # restrict networks, hide dust
+chainq portfolio 0x... -n ethereum -n base --min-usd 1        # restrict networks, hide dust below $1
+chainq portfolio 0x... --hide-unpriced                        # also drop tokens with no known USD price
+chainq portfolio 0x... --defi                                 # fold in Hyperliquid perp equity + spot balances
 chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
 chainq gas -n base                                            # gas price, base fee, transfer cost in USD
@@ -84,6 +91,16 @@ chainq protocols uniswap stats                           # protocol TVL + 24h/7d
 ```
 
 `pool` (singular) reads factory/pool/StateView contracts directly — authoritative prices and reserves (v4 reports price + in-range liquidity, no reserves; its biggest pools use native 'eth', not weth). `pools` (plural) uses DexScreener for discovery/ranking (symbols resolve through the built-in token registry; prefer addresses for long-tail tokens). Thin low-liquidity tiers can show stale prices — compare across tiers/versions.
+
+## Aerodrome (Base DEX)
+
+```bash
+chainq protocols aerodrome stats                  # protocol TVL (AMM + Slipstream CL), 24h volume, fees, AERO price
+chainq protocols aerodrome pools -l 10            # top pools by TVL, with swap-fee vs emission APY split
+chainq protocols aerodrome pools -p cl --min-tvl 1000000   # -p all|v1(amm)|cl(slipstream), hide small pools
+```
+
+APY split: `apy_base_pct` is the swap-fee yield, `apy_reward_pct` is AERO emissions. Pool/volume/fee data via DefiLlama, AERO price via CoinGecko.
 
 ## Pendle (yields)
 
@@ -119,10 +136,11 @@ chainq protocols hl price BTC ETH            # perps: mark/oracle price, 24h cha
 chainq protocols hl markets -l 10 -s oi      # top perp markets; sort: volume | oi | funding | change
 chainq protocols hl funding                  # most extreme funding rates (hourly % and APR)
 chainq protocols hl funding BTC ETH          # funding for specific coins
+chainq protocols hl funding BTC --history -D 30  # historical funding over N days: cumulative, mean, APR, range
 chainq protocols hl positions 0xADDRESS      # perp account value, margin, positions with PnL/liq price
 chainq protocols hl spot price HYPE PURR     # spot pairs: price, 24h change, volume, mcap
 chainq protocols hl spot markets -l 10       # top spot markets by volume
-chainq protocols hl spot balances 0xADDRESS  # spot token balances with USD values
+chainq protocols hl spot balances 0xADDRESS --min-usd 10  # spot token balances with USD values (hide dust)
 chainq protocols hl dexs                     # HIP-3 builder-deployed perp dexs (xyz, flx, vntl...)
 chainq protocols hl markets --dex xyz        # builder dex markets (tokenized stocks, commodities)
 chainq protocols hl price TSLA --dex xyz     # coin names are dex:COIN; bare COIN works with --dex

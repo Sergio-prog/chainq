@@ -73,8 +73,10 @@ Requires Python 3.12+ (the install script bootstraps uv, which handles that for 
 ```bash
 chainq price eth btc sol         # spot price, 24h change, market cap
 chainq price 0xTokenAddress      # any token by contract address (DexScreener fallback for long-tail)
+chainq price btc --at 2025-03-01 # historical price on a date (last 365 days)
+chainq candles btc --days 30     # OHLC candles; granularity auto-scales with the window
 chainq trending                  # trending assets right now
-chainq stables                   # stablecoins by mcap: peg price, supply changes, mechanism
+chainq stables --min-mcap 1e9    # stablecoins by mcap: peg price, supply changes, mechanism
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
@@ -86,6 +88,7 @@ chainq networks                                       # supported networks and a
 chainq balance vitalik.eth                            # native balance, ENS supported
 chainq balance 0x... --coin usdt -n arbitrum          # ERC-20 by symbol or contract address
 chainq portfolio vitalik.eth                          # all networks: native + known tokens, USD total
+chainq portfolio 0x... --defi --hide-unpriced         # fold in Hyperliquid perp+spot; drop dust/unpriced
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch
@@ -119,6 +122,9 @@ Sky and Ethena:
 ```bash
 chainq protocols sky rate                         # Sky Savings Rate (sUSDS) + legacy DSR, onchain
 chainq protocols ethena yield                     # sUSDe APY, protocol yield, USDe supply/peg
+chainq protocols lido apr                         # stETH staking APR (7d SMA), TVL, wstETH rate
+chainq protocols aerodrome stats                  # Base DEX: TVL (AMM+CL), 24h volume, fees, AERO price
+chainq protocols aerodrome pools -l 10            # top Aerodrome pools by TVL, fee vs emission APY split
 ```
 
 Hyperliquid (public data, incl. HIP-3 builder dexs and HIP-4 outcome markets):
@@ -127,6 +133,7 @@ Hyperliquid (public data, incl. HIP-3 builder dexs and HIP-4 outcome markets):
 chainq protocols hl price BTC ETH                 # perps: mark price, 24h change, volume, OI, funding
 chainq protocols hl markets -s oi                 # top perp markets by volume | oi | funding | change
 chainq protocols hl funding                       # most extreme funding rates (hourly + APR)
+chainq protocols hl funding BTC --history -D 30    # historical funding: cumulative, mean, APR, range
 chainq protocols hl positions 0xADDRESS           # perp account: value, margin, positions with PnL
 chainq protocols hl dexs                          # HIP-3 builder-deployed perp dexs
 chainq protocols hl markets --dex xyz             # markets on a builder dex (tokenized stocks etc.)
@@ -201,9 +208,13 @@ NFT floors, Uniswap pools, stablecoin protocols (Sky, Ethena), portfolio sweep, 
 
 ```bash
 uv sync
-uv run pytest
+uv run pytest                       # unit tests (provider calls are not mocked)
+uv run pytest -m live              # live smoke tests: one command per provider against real endpoints
 uv run ruff check .
+uv run python scripts/gen_changelog.py   # regenerate CHANGELOG.md from conventional commits
 ```
+
+Release notes live in [CHANGELOG.md](CHANGELOG.md), generated from conventional commit history.
 
 ## License
 

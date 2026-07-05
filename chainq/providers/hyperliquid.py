@@ -55,6 +55,13 @@ def clearinghouse_state(address: str) -> dict:
     return info({"type": "clearinghouseState", "user": address})
 
 
+def funding_history(coin: str, start_time_ms: int, dex: str = "") -> list[dict]:
+    payload: dict = {"type": "fundingHistory", "coin": coin, "startTime": start_time_ms}
+    if dex:
+        payload["dex"] = dex
+    return info(payload) or []
+
+
 def perp_dexs() -> list[dict]:
     return [dex for dex in info({"type": "perpDexs"}) if dex]
 

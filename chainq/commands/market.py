@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
@@ -51,9 +52,56 @@ def _locate_contract(address: str, network_key: str | None) -> tuple[dict | None
     return coin, best_pair
 
 
+def _resolve_coin_id(query: str, network_key: str | None) -> str:
+    if coingecko.is_address(query):
+        coin, _ = _locate_contract(query, network_key)
+        if coin is None:
+            raise ChainqError(f"no CoinGecko asset for contract {query}; historical data needs a listed asset")
+        return coin["id"]
+    return coingecko.resolve_id(query)
+
+
+def _to_ddmmyyyy(date: str) -> str:
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(date, fmt).strftime("%d-%m-%Y")
+        except ValueError:
+            continue
+    raise ChainqError(f"could not parse date '{date}' (use YYYY-MM-DD)")
+
+
+def _price_at(out: Out, assets: list[str], network_key: str | None, at: str):
+    ddmmyyyy = _to_ddmmyyyy(at)
+    iso = datetime.strptime(ddmmyyyy, "%d-%m-%Y").strftime("%Y-%m-%d")
+    data, lines, quiet_values = [], [], []
+    for query in assets:
+        coin_id = _resolve_coin_id(query, network_key)
+        md = (coingecko.history(coin_id, ddmmyyyy) or {}).get("market_data")
+        price_usd = (md or {}).get("current_price", {}).get("usd")
+        if price_usd is None:
+            raise ChainqError(f"no price for '{query}' on {iso} (CoinGecko public API covers the last 365 days)")
+        row = {
+            "id": coin_id,
+            "symbol": query.upper() if coingecko.is_address(query) else query.lower(),
+            "date": iso,
+            "price_usd": price_usd,
+            "market_cap_usd": (md or {}).get("market_cap", {}).get("usd"),
+            "volume_24h_usd": (md or {}).get("total_volume", {}).get("usd"),
+            "source": "coingecko",
+        }
+        data.append(row)
+        line = f"{coin_id} on {iso}: {fmt_usd(price_usd)}"
+        if row["market_cap_usd"]:
+            line += f"  mcap {humanize_usd(row['market_cap_usd'])}"
+        lines.append(line)
+        quiet_values.append(str(price_usd))
+    out.emit(data if len(data) > 1 else data[0], lines, quiet_value="\n".join(quiet_values))
+
+
 def price(
     assets: Annotated[list[str], typer.Argument(help="asset symbols, CoinGecko ids, or token contract addresses")],
     network: Annotated[str | None, typer.Option("--network", "-n", help="network hint for contract addresses")] = None,
+    at: Annotated[str | None, typer.Option("--at", help="historical date (YYYY-MM-DD, within last 365 days)")] = None,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -62,6 +110,9 @@ def price(
     """Spot price, 24h change, and market cap for one or more assets."""
     out = Out(json_out, quiet, verbose, format)
     network_key = resolve_network(network).key if network else None
+    if at:
+        _price_at(out, assets, network_key, at)
+        return
     entries: list[tuple[str, str | None, dict | None]] = []
     ids = []
     for query in assets:
@@ -255,3 +306,68 @@ def search(
         for c in coins
     ]
     out.emit(data, lines, quiet_value="\n".join(c["id"] for c in coins))
+
+
+def candles(
+    asset: Annotated[str, typer.Argument(help="asset symbol, CoinGecko id, or token contract address")],
+    days: Annotated[int, typer.Option("--days", "-d", help="lookback window in days")] = 30,
+    network: Annotated[str | None, typer.Option("--network", "-n", help="network hint for contract addresses")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="show only the most recent N candles (0 = all)")] = 0,
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """OHLC candles for an asset (CoinGecko); granularity auto-scales with --days."""
+    out = Out(json_out, quiet, verbose, format)
+    network_key = resolve_network(network).key if network else None
+    coin_id = _resolve_coin_id(asset, network_key)
+    effective_days = coingecko.snap_ohlc_days(days)
+    raw = coingecko.ohlc(coin_id, effective_days)
+    if not raw:
+        raise ChainqError(f"no OHLC data for '{asset}' (resolved to '{coin_id}')")
+    candles_data = [
+        {
+            "time": datetime.fromtimestamp(ts / 1000, UTC).strftime("%Y-%m-%d %H:%M"),
+            "open": o,
+            "high": h,
+            "low": low,
+            "close": close,
+        }
+        for ts, o, h, low, close in raw
+    ]
+    span_hours = (raw[1][0] - raw[0][0]) / 3_600_000 if len(raw) > 1 else 0
+    granularity = f"{int(span_hours)}h" if span_hours < 24 else f"{int(span_hours / 24)}d"
+    first, last = raw[0], raw[-1]
+    change = (last[4] / first[1] - 1) * 100 if first[1] else None
+    high = max(c[2] for c in raw)
+    low = min(c[3] for c in raw)
+    shown = candles_data[-limit:] if limit else candles_data
+    summary = {
+        "id": coin_id,
+        "days": effective_days,
+        "granularity": granularity,
+        "candle_count": len(candles_data),
+        "open_usd": first[1],
+        "close_usd": last[4],
+        "change_pct": change,
+        "high_usd": high,
+        "low_usd": low,
+        "candles": shown,
+        "source": "coingecko",
+    }
+    lines = [
+        f"{coin_id} {effective_days}d ({granularity} candles): "
+        f"{fmt_usd(first[1])} → {fmt_usd(last[4])} ({fmt_pct(change)}), "
+        f"high {fmt_usd(high)}, low {fmt_usd(low)}, {len(candles_data)} candles"
+    ]
+    lines += [
+        f"  {c['time']}  O {fmt_usd(c['open'])}  H {fmt_usd(c['high'])}  L {fmt_usd(c['low'])}  C {fmt_usd(c['close'])}"
+        for c in shown
+    ]
+    out.emit(
+        summary,
+        lines,
+        quiet_value=last[4],
+        verbose_lines=[f"coingecko id: {coin_id}", f"requested {days}d, snapped to {effective_days}d"],
+    )

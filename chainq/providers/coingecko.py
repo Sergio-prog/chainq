@@ -179,6 +179,21 @@ def simple_price(ids: list[str]) -> dict:
     return _get("/simple/price", {"ids": ",".join(ids), "vs_currencies": "usd"})
 
 
+OHLC_DAYS = (1, 7, 14, 30, 90, 180, 365)
+
+
+def snap_ohlc_days(days: int) -> int:
+    return next((d for d in OHLC_DAYS if d >= days), OHLC_DAYS[-1])
+
+
+def ohlc(coin_id: str, days: int) -> list[list[float]]:
+    return _get(f"/coins/{coin_id}/ohlc", {"vs_currency": "usd", "days": days}, ttl=300)
+
+
+def history(coin_id: str, date_ddmmyyyy: str) -> dict:
+    return _get(f"/coins/{coin_id}/history", {"date": date_ddmmyyyy, "localization": "false"}, ttl=3600)
+
+
 def try_price_usd(coin_id: str | None) -> float | None:
     if not coin_id:
         return None

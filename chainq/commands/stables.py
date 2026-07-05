@@ -22,6 +22,7 @@ def stables(
         str | None, typer.Option("--mechanism", "-m", help="fiat-backed | crypto-backed | algorithmic")
     ] = None,
     limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
+    min_mcap: Annotated[float, typer.Option("--min-mcap", help="hide stablecoins with market cap below this")] = 0,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -33,6 +34,8 @@ def stables(
         raise ChainqError(f"unknown mechanism '{mechanism}' (use: {', '.join(MECHANISMS)})")
     rows = [dict(s) for s in defillama.stablecoins() if s["mcap_usd"]]
     total_mcap = sum(r["mcap_usd"] for r in rows)
+    if min_mcap:
+        rows = [r for r in rows if r["mcap_usd"] >= min_mcap]
     if coin:
         needle = coin.strip().lower()
         rows = [r for r in rows if needle in (r["symbol"] or "").lower() or needle in (r["name"] or "").lower()]

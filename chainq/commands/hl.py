@@ -1,3 +1,5 @@
+import time
+from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
@@ -87,18 +89,63 @@ def markets(
     )
 
 
+def _funding_history(out: Out, coins: list[str], days: int, dex: str):
+    start = int((time.time() - days * 86400) * 1000)
+    rows = []
+    for coin in coins:
+        series = hyperliquid.funding_history(coin, start, dex)
+        if not series:
+            raise ChainqError(f"no funding history for '{coin}' over the last {days}d")
+        rates = [float(p["fundingRate"]) for p in series]
+        cumulative = sum(rates)
+        mean_hourly = cumulative / len(rates)
+        rows.append(
+            {
+                "coin": coin.upper(),
+                "days": days,
+                "samples": len(rates),
+                "cumulative_pct": cumulative * 100,
+                "mean_hourly_pct": mean_hourly * 100,
+                "annualized_apr_pct": mean_hourly * 24 * 365 * 100,
+                "min_hourly_pct": min(rates) * 100,
+                "max_hourly_pct": max(rates) * 100,
+                "start": datetime.fromtimestamp(series[0]["time"] / 1000, UTC).strftime("%Y-%m-%d %H:%M"),
+                "end": datetime.fromtimestamp(series[-1]["time"] / 1000, UTC).strftime("%Y-%m-%d %H:%M"),
+            }
+        )
+    lines = [
+        f"{r['coin']}-PERP funding {r['days']}d: cumulative {r['cumulative_pct']:+.4f}%  "
+        f"mean {r['mean_hourly_pct']:+.4f}%/h ({r['annualized_apr_pct']:+.1f}% APR)  "
+        f"range [{r['min_hourly_pct']:+.4f}, {r['max_hourly_pct']:+.4f}]%/h  {r['samples']} samples"
+        for r in rows
+    ]
+    out.emit(
+        rows if len(rows) > 1 else rows[0],
+        lines,
+        quiet_value="\n".join(str(r["annualized_apr_pct"]) for r in rows),
+        verbose_lines=[f"{r['coin']}: {r['start']} → {r['end']}" for r in rows],
+    )
+
+
 @app.command()
 def funding(
     coins: Annotated[list[str] | None, typer.Argument(help="perp coins; omit for top by |rate|")] = None,
     limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
+    history: Annotated[bool, typer.Option("--history", "-H", help="historical funding over --days")] = False,
+    days: Annotated[int, typer.Option("--days", "-D", help="lookback window for --history")] = 7,
     dex: DexOpt = "",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
     format: FormatOpt = "text",
 ):
-    """Current hourly funding rates and annualized APR."""
+    """Current hourly funding rates and annualized APR (--history for a lookback window)."""
     out = Out(json_out, quiet, verbose, format)
+    if history:
+        if not coins:
+            raise ChainqError("--history needs at least one coin, e.g. `hl funding BTC --history`")
+        _funding_history(out, coins, days, dex)
+        return
     all_markets = hyperliquid.perp_markets(dex)
     if coins:
         selected = _find(all_markets, coins)
@@ -322,6 +369,7 @@ def spot_markets(
 @spot_app.command(name="balances")
 def spot_balances(
     address: Annotated[str, typer.Argument(help="account address (0x...)")],
+    min_usd: Annotated[float, typer.Option("--min-usd", help="hide balances worth less than this")] = 0,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -343,13 +391,16 @@ def spot_balances(
         if total == 0:
             continue
         price = prices.get(b.get("coin"))
+        value_usd = total * price if price is not None else None
+        if value_usd is not None and value_usd < min_usd:
+            continue
         rows.append(
             {
                 "coin": b.get("coin"),
                 "total": total,
                 "hold": float(b.get("hold") or 0),
                 "price_usd": price,
-                "value_usd": total * price if price is not None else None,
+                "value_usd": value_usd,
             }
         )
     rows.sort(key=lambda r: r["value_usd"] or 0, reverse=True)

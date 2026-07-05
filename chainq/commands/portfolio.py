@@ -8,7 +8,7 @@ from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
-from chainq.providers import coingecko
+from chainq.providers import coingecko, hyperliquid
 from chainq.rpc import connect, erc20, resolve_address
 from chainq.tokens import TOKENS
 
@@ -46,6 +46,53 @@ def _scan_network(net_key: str, address: str) -> list[dict]:
     return assets
 
 
+def _scan_hyperliquid(address: str) -> list[dict]:
+    assets: list[dict] = []
+    try:
+        state = hyperliquid.clearinghouse_state(address)
+        equity = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+        if equity:
+            assets.append(
+                {
+                    "network": "hyperliquid",
+                    "symbol": "perp equity (USDC)",
+                    "token_address": None,
+                    "amount": str(equity),
+                    "price_usd": 1.0,
+                    "value_usd": equity,
+                }
+            )
+    except Exception:
+        pass
+    try:
+        balances = hyperliquid.spot_balances(address)
+    except Exception:
+        return assets
+    if not balances:
+        return assets
+    prices = {"USDC": 1.0}
+    for m in hyperliquid.spot_markets():
+        price = m["mid_price"] or m["mark_price"]
+        if m["base"] and price:
+            prices[m["base"]] = price
+    for b in balances:
+        total = float(b.get("total") or 0)
+        if not total:
+            continue
+        price = prices.get(b.get("coin"))
+        assets.append(
+            {
+                "network": "hyperliquid",
+                "symbol": b.get("coin"),
+                "token_address": None,
+                "amount": str(total),
+                "price_usd": price,
+                "value_usd": total * price if price is not None else None,
+            }
+        )
+    return assets
+
+
 def _priced(assets: list[dict]) -> list[dict]:
     ids = sorted({a["coingecko_id"] for a in assets if a["coingecko_id"]})
     prices = {}
@@ -67,6 +114,12 @@ def portfolio(
         list[str] | None, typer.Option("--network", "-n", help="network(s) to scan; default: all")
     ] = None,
     min_usd: Annotated[float, typer.Option("--min-usd", help="hide assets worth less than this")] = 0.01,
+    hide_unpriced: Annotated[
+        bool, typer.Option("--hide-unpriced", help="drop assets with no known USD price")
+    ] = False,
+    defi: Annotated[
+        bool, typer.Option("--defi", help="also fold in Hyperliquid perp equity and spot balances")
+    ] = False,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -86,7 +139,20 @@ def portfolio(
             except Exception:
                 unreachable.append(futures[future])
     assets = _priced(assets)
-    assets = [a for a in assets if a["value_usd"] is None or a["value_usd"] >= min_usd]
+    if defi:
+        assets.extend(_scan_hyperliquid(addr))
+    kept = []
+    hidden = 0
+    for a in assets:
+        if a["value_usd"] is None:
+            if hide_unpriced:
+                hidden += 1
+                continue
+        elif a["value_usd"] < min_usd:
+            hidden += 1
+            continue
+        kept.append(a)
+    assets = kept
     assets.sort(key=lambda a: (a["value_usd"] is None, -(a["value_usd"] or 0)))
     if not assets and unreachable:
         raise ChainqError(f"no assets found; unreachable networks: {', '.join(sorted(unreachable))}")
@@ -96,6 +162,7 @@ def portfolio(
         "input": address,
         "networks_scanned": len(keys) - len(unreachable),
         "unreachable": sorted(unreachable),
+        "hidden_assets": hidden,
         "total_usd": total,
         "assets": assets,
     }
@@ -106,6 +173,8 @@ def portfolio(
         + (f" (~{fmt_usd(a['value_usd'])})" if a["value_usd"] is not None else "")
         for a in assets
     ]
+    if hidden:
+        lines.append(f"  ({hidden} asset(s) below {fmt_usd(min_usd)}{' or unpriced' if hide_unpriced else ''} hidden)")
     if unreachable:
         lines.append(f"  (unreachable: {', '.join(sorted(unreachable))})")
     out.emit(
@@ -113,7 +182,7 @@ def portfolio(
         lines,
         quiet_value=total,
         verbose_lines=[
-            f"scanned {len(keys)} network(s), tokens from the built-in registry only",
+            f"scanned {len(keys)} network(s), registry tokens" + (" + Hyperliquid" if defi else ""),
             f"address: {addr}",
         ],
     )

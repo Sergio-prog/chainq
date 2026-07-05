@@ -5,6 +5,7 @@ from chainq.errors import ChainqError
 
 BASE_URL = "https://api.llama.fi"
 STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins"
+YIELDS_URL = "https://yields.llama.fi/pools"
 
 
 def _fetch(url: str, params: dict | None = None) -> dict | list:
@@ -135,3 +136,43 @@ def fees(slug: str) -> dict | None:
 
 def dex_volume(slug: str) -> dict | None:
     return _summary("dexs", slug)
+
+
+def tvl(slug: str) -> float | None:
+    key = cache.key_for("llama-tvl", slug)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        resp = http.get(f"{BASE_URL}/tvl/{slug}")
+    except httpx.HTTPError:
+        return None
+    if resp.status_code >= 400:
+        return None
+    value = resp.json()
+    result = float(value) if isinstance(value, int | float) else None
+    cache.put(key, result, ttl=300)
+    return result
+
+
+def yield_pools(projects: tuple[str, ...] | None = None) -> list[dict]:
+    key = cache.key_for("llama-yields")
+    cached = cache.get(key)
+    if cached is None:
+        cached = [
+            {
+                "symbol": p.get("symbol"),
+                "project": p.get("project"),
+                "chain": p.get("chain"),
+                "tvl_usd": p.get("tvlUsd"),
+                "apy_pct": p.get("apy"),
+                "apy_base_pct": p.get("apyBase"),
+                "apy_reward_pct": p.get("apyReward"),
+                "pool": p.get("pool"),
+            }
+            for p in _fetch(YIELDS_URL).get("data") or []
+        ]
+        cache.put(key, cached, ttl=300)
+    if projects:
+        return [p for p in cached if p["project"] in projects]
+    return cached

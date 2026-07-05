@@ -1,3 +1,4 @@
+import json
 import sys
 
 import httpx
@@ -25,6 +26,7 @@ app.command()(market.price)
 app.command()(market.asset)
 app.command()(market.search)
 app.command()(market.trending)
+app.command()(market.candles)
 app.command()(stables.stables)
 app.command()(update.update)
 app.add_typer(protocols.app, name="protocols")
@@ -38,13 +40,31 @@ def version():
     print(__version__)
 
 
+def _wants_json() -> bool:
+    args = sys.argv[1:]
+    if "--json" in args:
+        return True
+    for i, arg in enumerate(args):
+        if arg in ("--format", "-f") and i + 1 < len(args) and args[i + 1] == "json":
+            return True
+        if arg in ("--format=json", "-f=json"):
+            return True
+    return False
+
+
+def _fail(message: str) -> None:
+    if _wants_json():
+        print(json.dumps({"error": message}))
+    else:
+        print(f"error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
 def run():
     try:
         update.maybe_remind()
         app()
     except ChainqError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        sys.exit(1)
+        _fail(str(exc))
     except httpx.HTTPError as exc:
-        print(f"error: http request failed: {exc}", file=sys.stderr)
-        sys.exit(1)
+        _fail(f"http request failed: {exc}")
