@@ -2,6 +2,19 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.13.0
+
+### Features
+- resolve .sol domains via Solana Name Service
+- add curve protocol commands
+- add address intelligence command
+- add solana support across core commands
+- batch onchain reads with Multicall3
+
+### Documentation
+- compact the skill description
+- regenerate changelog for v0.12.1
+
 ## v0.12.1
 
 ### Fixes
