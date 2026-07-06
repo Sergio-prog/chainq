@@ -94,7 +94,7 @@ chainq tx 0xHASH -n ethereum                          # status, parties, value, 
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch
 ```
 
-25 networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`.
+25 networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 
 ### Protocols
 

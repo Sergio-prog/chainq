@@ -66,7 +66,7 @@ chainq rpc eth_blockNumber -n optimism                        # raw JSON-RPC esc
 chainq rpc eth_getBlockByNumber latest false                  # params: JSON literals parsed, rest strings
 ```
 
-Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value.
+Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value. Registry-token reads are batched via Multicall3, so `portfolio` is one RPC call per network.
 
 ## Aave v3 (lending)
 

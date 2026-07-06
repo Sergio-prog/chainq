@@ -5,11 +5,20 @@ from eth_abi import encode
 from web3 import Web3
 
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd
+from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import uniswap
-from chainq.rpc import connect, erc20
+from chainq.rpc import (
+    connect,
+    decode_address,
+    decode_string,
+    decode_uint,
+    encode_call,
+    encode_erc20,
+    erc20,
+    multicall,
+)
 from chainq.tokens import TOKENS
 
 app = typer.Typer(no_args_is_help=True, help="Uniswap pools (onchain v2/v3/v4 + indexed discovery) and protocol stats.")
@@ -85,186 +94,235 @@ def _resolve_pool_token(value: str, net, native_ok: bool) -> str:
     return address
 
 
-def _token_info(client, address: str, net, memo: dict) -> tuple[str, int]:
-    if address not in memo:
+def _token_infos(client, net, addresses: list[str], memo: dict) -> None:
+    pending = []
+    for address in addresses:
         if int(address, 16) == 0:
             memo[address] = (net.native_symbol, 18)
-        else:
+        elif address not in memo and address not in pending:
+            pending.append(address)
+    if not pending:
+        return
+    calls = []
+    for address in pending:
+        calls.append((address, encode_erc20("symbol")))
+        calls.append((address, encode_erc20("decimals")))
+    try:
+        results = multicall(client, calls)
+    except Exception:
+        for address in pending:
             contract = erc20(client, address)
             memo[address] = (contract.functions.symbol().call(), contract.functions.decimals().call())
-    return memo[address]
+        return
+    for i, address in enumerate(pending):
+        symbol, decimals = results[2 * i], results[2 * i + 1]
+        memo[address] = (
+            decode_string(symbol) if symbol else short_addr(address),
+            decode_uint(decimals) if decimals else 18,
+        )
 
 
 def _sqrt_price(sqrt_price_x96: int, dec0: int, dec1: int) -> float:
     return (sqrt_price_x96 / 2**96) ** 2 * 10 ** (dec0 - dec1)
 
 
-def _v2_rows(client, net, address_a: str, address_b: str, memo: dict) -> list[dict]:
-    factory = client.w3.eth.contract(
-        address=Web3.to_checksum_address(uniswap.V2_FACTORIES[net.key]), abi=uniswap.V2_FACTORY_ABI
+def _v4_pool_id(currency0: str, currency1: str, tier: int, tick_spacing: int) -> bytes:
+    return Web3.keccak(
+        encode(
+            ["address", "address", "uint24", "int24", "address"],
+            [
+                Web3.to_checksum_address(currency0),
+                Web3.to_checksum_address(currency1),
+                tier,
+                tick_spacing,
+                ZERO_ADDRESS,
+            ],
+        )
     )
-    pair_address = factory.functions.getPair(
-        Web3.to_checksum_address(address_a), Web3.to_checksum_address(address_b)
-    ).call()
-    if int(pair_address, 16) == 0:
-        return []
-    pair = client.w3.eth.contract(address=pair_address, abi=uniswap.V2_PAIR_ABI)
-    token0 = pair.functions.token0().call()
-    token1 = pair.functions.token1().call()
-    sym0, dec0 = _token_info(client, token0, net, memo)
-    sym1, dec1 = _token_info(client, token1, net, memo)
-    reserve0_raw, reserve1_raw, _ = pair.functions.getReserves().call()
-    reserve0 = reserve0_raw / 10**dec0
-    reserve1 = reserve1_raw / 10**dec1
-    if reserve0 == 0:
-        return []
+
+
+def _onchain_rows(client, net, version: str, token_a: str, token_b: str, fees: list[int], supported: dict) -> list[dict]:
+    memo: dict = {}
+    erc_a = erc_b = None
+    if any(version in (v, "all") and supported[v] for v in ("v2", "v3")):
+        erc_a = Web3.to_checksum_address(_resolve_pool_token(token_a, net, False))
+        erc_b = Web3.to_checksum_address(_resolve_pool_token(token_b, net, False))
+    use_v4 = version in ("v4", "all") and supported["v4"]
+    currency0 = currency1 = None
+    if use_v4:
+        v4_a = _resolve_pool_token(token_a, net, True)
+        v4_b = _resolve_pool_token(token_b, net, True)
+        currency0, currency1 = sorted((v4_a, v4_b), key=lambda a: int(a, 16))
+    discovery: list[tuple[str, int | None]] = []
+    calls: list[tuple[str, bytes]] = []
+    if version in ("v2", "all") and supported["v2"]:
+        discovery.append(("v2", None))
+        calls.append((uniswap.V2_FACTORIES[net.key], encode_call(uniswap.V2_FACTORY_ABI, "getPair", [erc_a, erc_b])))
+    if version in ("v3", "all") and supported["v3"]:
+        for tier in fees:
+            discovery.append(("v3", tier))
+            calls.append(
+                (uniswap.V3_FACTORIES[net.key], encode_call(uniswap.V3_FACTORY_ABI, "getPool", [erc_a, erc_b, tier]))
+            )
+    found = []
+    if calls:
+        for (ver, tier), result in zip(discovery, multicall(client, calls), strict=True):
+            if result is not None and int.from_bytes(result[12:32], "big"):
+                found.append((ver, tier, decode_address(result)))
+    meta_addresses = []
+    if found:
+        meta_addresses += [erc_a, erc_b]
+    if use_v4:
+        meta_addresses += [currency0, currency1]
+    _token_infos(client, net, meta_addresses, memo)
+    state_plan: list[tuple] = []
+    state_calls: list[tuple[str, bytes]] = []
+    token0 = token1 = None
+    if found:
+        token0, token1 = sorted((erc_a, erc_b), key=lambda a: int(a, 16))
+    for ver, tier, pool_address in found:
+        if ver == "v2":
+            state_plan.append(("v2", tier, pool_address, 1))
+            state_calls.append((pool_address, encode_call(uniswap.V2_PAIR_ABI, "getReserves")))
+        else:
+            state_plan.append(("v3", tier, pool_address, 3))
+            state_calls.append((pool_address, encode_call(uniswap.V3_POOL_ABI, "slot0")))
+            state_calls.append((token0, encode_erc20("balanceOf", [pool_address])))
+            state_calls.append((token1, encode_erc20("balanceOf", [pool_address])))
+    if use_v4:
+        state_view = uniswap.V4_STATE_VIEWS[net.key]
+        for tier in fees:
+            tick_spacing = uniswap.V4_FEE_TICK_SPACING.get(tier)
+            if tick_spacing is None:
+                continue
+            pool_id = _v4_pool_id(currency0, currency1, tier, tick_spacing)
+            state_plan.append(("v4", tier, f"0x{pool_id.hex().removeprefix('0x')}", 2))
+            state_calls.append((state_view, encode_call(uniswap.V4_STATE_VIEW_ABI, "getSlot0", [pool_id])))
+            state_calls.append((state_view, encode_call(uniswap.V4_STATE_VIEW_ABI, "getLiquidity", [pool_id])))
+    results = multicall(client, state_calls)
+    rows = []
+    cursor = 0
+    for ver, tier, pool_address, width in state_plan:
+        chunk = results[cursor : cursor + width]
+        cursor += width
+        if ver == "v2":
+            if chunk[0] is None:
+                continue
+            sym0, dec0 = memo[token0]
+            sym1, dec1 = memo[token1]
+            reserve0 = decode_uint(chunk[0][:32]) / 10**dec0
+            reserve1 = decode_uint(chunk[0][32:64]) / 10**dec1
+            if not reserve0:
+                continue
+            rows.append(
+                {
+                    "version": "v2",
+                    "pool_address": pool_address,
+                    "fee_pct": 0.3,
+                    "pair": f"{sym0}/{sym1}",
+                    "price": reserve1 / reserve0,
+                    "reserve0": reserve0,
+                    "reserve1": reserve1,
+                    "token0": token0,
+                    "token1": token1,
+                }
+            )
+        elif ver == "v3":
+            slot0, balance0, balance1 = chunk
+            if slot0 is None or not decode_uint(slot0):
+                continue
+            sym0, dec0 = memo[token0]
+            sym1, dec1 = memo[token1]
+            rows.append(
+                {
+                    "version": "v3",
+                    "pool_address": pool_address,
+                    "fee_pct": tier / 10000,
+                    "pair": f"{sym0}/{sym1}",
+                    "price": _sqrt_price(decode_uint(slot0), dec0, dec1),
+                    "reserve0": decode_uint(balance0) / 10**dec0 if balance0 else None,
+                    "reserve1": decode_uint(balance1) / 10**dec1 if balance1 else None,
+                    "token0": token0,
+                    "token1": token1,
+                }
+            )
+        else:
+            slot0, liquidity = chunk
+            if slot0 is None or not decode_uint(slot0):
+                continue
+            sym0, dec0 = memo[currency0]
+            sym1, dec1 = memo[currency1]
+            rows.append(
+                {
+                    "version": "v4",
+                    "pool_address": pool_address,
+                    "fee_pct": tier / 10000,
+                    "pair": f"{sym0}/{sym1}",
+                    "price": _sqrt_price(decode_uint(slot0), dec0, dec1),
+                    "reserve0": None,
+                    "reserve1": None,
+                    "in_range_liquidity": decode_uint(liquidity) if liquidity else None,
+                    "token0": currency0,
+                    "token1": currency1,
+                }
+            )
+    return rows
+
+
+def _pool_by_address(client, net, address: str, memo: dict) -> list[dict]:
+    checksummed = Web3.to_checksum_address(address)
+    slot0, fee_raw, reserves, token0_raw, token1_raw = multicall(
+        client,
+        [
+            (checksummed, encode_call(uniswap.V3_POOL_ABI, "slot0")),
+            (checksummed, encode_call(uniswap.V3_POOL_ABI, "fee")),
+            (checksummed, encode_call(uniswap.V2_PAIR_ABI, "getReserves")),
+            (checksummed, encode_call(uniswap.V2_PAIR_ABI, "token0")),
+            (checksummed, encode_call(uniswap.V2_PAIR_ABI, "token1")),
+        ],
+    )
+    if token0_raw is None or token1_raw is None or (slot0 is None and reserves is None):
+        raise ChainqError(
+            f"{address} is not a readable Uniswap v2/v3 pool on {net.name} "
+            "(v4 pools have no address — pass the two tokens instead)"
+        )
+    token0, token1 = decode_address(token0_raw), decode_address(token1_raw)
+    _token_infos(client, net, [token0, token1], memo)
+    sym0, dec0 = memo[token0]
+    sym1, dec1 = memo[token1]
+    if slot0 is not None and fee_raw is not None:
+        balance0, balance1 = multicall(
+            client,
+            [(token0, encode_erc20("balanceOf", [checksummed])), (token1, encode_erc20("balanceOf", [checksummed]))],
+        )
+        return [
+            {
+                "version": "v3",
+                "pool_address": checksummed,
+                "fee_pct": decode_uint(fee_raw) / 10000,
+                "pair": f"{sym0}/{sym1}",
+                "price": _sqrt_price(decode_uint(slot0), dec0, dec1),
+                "reserve0": decode_uint(balance0) / 10**dec0 if balance0 else None,
+                "reserve1": decode_uint(balance1) / 10**dec1 if balance1 else None,
+                "token0": token0,
+                "token1": token1,
+            }
+        ]
+    reserve0 = decode_uint(reserves[:32]) / 10**dec0
+    reserve1 = decode_uint(reserves[32:64]) / 10**dec1
     return [
         {
             "version": "v2",
-            "pool_address": pair_address,
+            "pool_address": checksummed,
             "fee_pct": 0.3,
             "pair": f"{sym0}/{sym1}",
-            "price": reserve1 / reserve0,
+            "price": reserve1 / reserve0 if reserve0 else None,
             "reserve0": reserve0,
             "reserve1": reserve1,
             "token0": token0,
             "token1": token1,
         }
     ]
-
-
-def _v3_rows(client, net, address_a: str, address_b: str, fees: list[int], memo: dict) -> list[dict]:
-    factory = client.w3.eth.contract(
-        address=Web3.to_checksum_address(uniswap.V3_FACTORIES[net.key]), abi=uniswap.V3_FACTORY_ABI
-    )
-    rows = []
-    for tier in fees:
-        pool_address = factory.functions.getPool(
-            Web3.to_checksum_address(address_a), Web3.to_checksum_address(address_b), tier
-        ).call()
-        if int(pool_address, 16) == 0:
-            continue
-        pool_contract = client.w3.eth.contract(address=pool_address, abi=uniswap.V3_POOL_ABI)
-        token0 = pool_contract.functions.token0().call()
-        token1 = pool_contract.functions.token1().call()
-        sym0, dec0 = _token_info(client, token0, net, memo)
-        sym1, dec1 = _token_info(client, token1, net, memo)
-        sqrt_price = pool_contract.functions.slot0().call()[0]
-        if sqrt_price == 0:
-            continue
-        rows.append(
-            {
-                "version": "v3",
-                "pool_address": pool_address,
-                "fee_pct": tier / 10000,
-                "pair": f"{sym0}/{sym1}",
-                "price": _sqrt_price(sqrt_price, dec0, dec1),
-                "reserve0": erc20(client, token0).functions.balanceOf(pool_address).call() / 10**dec0,
-                "reserve1": erc20(client, token1).functions.balanceOf(pool_address).call() / 10**dec1,
-                "token0": token0,
-                "token1": token1,
-            }
-        )
-    return rows
-
-
-def _v4_rows(client, net, address_a: str, address_b: str, fees: list[int], memo: dict) -> list[dict]:
-    state_view = client.w3.eth.contract(
-        address=Web3.to_checksum_address(uniswap.V4_STATE_VIEWS[net.key]), abi=uniswap.V4_STATE_VIEW_ABI
-    )
-    currency0, currency1 = sorted((address_a, address_b), key=lambda a: int(a, 16))
-    sym0, dec0 = _token_info(client, currency0, net, memo)
-    sym1, dec1 = _token_info(client, currency1, net, memo)
-    rows = []
-    for tier in fees:
-        tick_spacing = uniswap.V4_FEE_TICK_SPACING.get(tier)
-        if tick_spacing is None:
-            continue
-        pool_id = Web3.keccak(
-            encode(
-                ["address", "address", "uint24", "int24", "address"],
-                [
-                    Web3.to_checksum_address(currency0),
-                    Web3.to_checksum_address(currency1),
-                    tier,
-                    tick_spacing,
-                    ZERO_ADDRESS,
-                ],
-            )
-        )
-        sqrt_price = state_view.functions.getSlot0(pool_id).call()[0]
-        if sqrt_price == 0:
-            continue
-        liquidity = state_view.functions.getLiquidity(pool_id).call()
-        rows.append(
-            {
-                "version": "v4",
-                "pool_address": pool_id.hex() if pool_id.hex().startswith("0x") else f"0x{pool_id.hex()}",
-                "fee_pct": tier / 10000,
-                "pair": f"{sym0}/{sym1}",
-                "price": _sqrt_price(sqrt_price, dec0, dec1),
-                "reserve0": None,
-                "reserve1": None,
-                "in_range_liquidity": liquidity,
-                "token0": currency0,
-                "token1": currency1,
-            }
-        )
-    return rows
-
-
-def _pool_by_address(client, net, address: str, memo: dict) -> list[dict]:
-    checksummed = Web3.to_checksum_address(address)
-    pool_v3 = client.w3.eth.contract(address=checksummed, abi=uniswap.V3_POOL_ABI)
-    try:
-        sqrt_price = pool_v3.functions.slot0().call()[0]
-        tier = pool_v3.functions.fee().call()
-        token0 = pool_v3.functions.token0().call()
-        token1 = pool_v3.functions.token1().call()
-        sym0, dec0 = _token_info(client, token0, net, memo)
-        sym1, dec1 = _token_info(client, token1, net, memo)
-        return [
-            {
-                "version": "v3",
-                "pool_address": checksummed,
-                "fee_pct": tier / 10000,
-                "pair": f"{sym0}/{sym1}",
-                "price": _sqrt_price(sqrt_price, dec0, dec1),
-                "reserve0": erc20(client, token0).functions.balanceOf(checksummed).call() / 10**dec0,
-                "reserve1": erc20(client, token1).functions.balanceOf(checksummed).call() / 10**dec1,
-                "token0": token0,
-                "token1": token1,
-            }
-        ]
-    except Exception:
-        pass
-    pair = client.w3.eth.contract(address=checksummed, abi=uniswap.V2_PAIR_ABI)
-    try:
-        token0 = pair.functions.token0().call()
-        token1 = pair.functions.token1().call()
-        reserve0_raw, reserve1_raw, _ = pair.functions.getReserves().call()
-        sym0, dec0 = _token_info(client, token0, net, memo)
-        sym1, dec1 = _token_info(client, token1, net, memo)
-        reserve0 = reserve0_raw / 10**dec0
-        reserve1 = reserve1_raw / 10**dec1
-        return [
-            {
-                "version": "v2",
-                "pool_address": checksummed,
-                "fee_pct": 0.3,
-                "pair": f"{sym0}/{sym1}",
-                "price": reserve1 / reserve0 if reserve0 else None,
-                "reserve0": reserve0,
-                "reserve1": reserve1,
-                "token0": token0,
-                "token1": token1,
-            }
-        ]
-    except Exception as exc:
-        raise ChainqError(
-            f"{address} is not a readable Uniswap v2/v3 pool on {net.name} "
-            "(v4 pools have no address — pass the two tokens instead)"
-        ) from exc
 
 
 @app.command()
@@ -314,18 +372,7 @@ def pool(
         raise ChainqError(f"no known Uniswap deployment on {net.name}")
     client = connect(net)
     fees = [fee] if fee else list(uniswap.V3_FEE_TIERS)
-    memo: dict = {}
-    rows: list[dict] = []
-    if version in ("v2", "all") and supported["v2"]:
-        rows += _v2_rows(client, net, _resolve_pool_token(token_a, net, False), _resolve_pool_token(token_b, net, False), memo)
-    if version in ("v3", "all") and supported["v3"]:
-        rows += _v3_rows(
-            client, net, _resolve_pool_token(token_a, net, False), _resolve_pool_token(token_b, net, False), fees, memo
-        )
-    if version in ("v4", "all") and supported["v4"]:
-        rows += _v4_rows(
-            client, net, _resolve_pool_token(token_a, net, True), _resolve_pool_token(token_b, net, True), fees, memo
-        )
+    rows = _onchain_rows(client, net, version, token_a, token_b, fees, supported)
     if not rows:
         raise ChainqError(f"no Uniswap pool for {token_a}/{token_b} on {net.name} (version: {version})")
     lines = []
