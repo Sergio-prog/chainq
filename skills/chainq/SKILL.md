@@ -60,6 +60,7 @@ chainq portfolio 0x... --hide-unpriced                        # also drop tokens
 chainq portfolio 0x... --defi                                 # fold in Hyperliquid perp equity + spot balances
 chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
+chainq address 0xADDR -n base                                 # what IS this: EOA vs contract, proxy impl, holdings
 chainq gas -n base                                            # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                                  # status, parties, value, fee, block
 chainq rpc eth_blockNumber -n optimism                        # raw JSON-RPC escape hatch, prints JSON
@@ -82,6 +83,10 @@ chainq tx 5UfDuX94A1Qfq... -n solana                          # by signature: st
 chainq gas -n solana                                          # base fee + median priority fee, transfer cost USD
 chainq rpc getSlot -n solana                                  # raw Solana JSON-RPC
 ```
+
+## Address intelligence
+
+`chainq address <addr>` answers "what is this address?" on any network: EOA vs contract (with EIP-7702 delegation detection), proxy resolution (EIP-1967/1167/ZeppelinOS → implementation address), ERC-20 token profile (name, symbol, decimals, supply), tx count, native + registry token holdings with USD values, reverse ENS on ethereum, explorer link. On Solana: wallet vs program, owner program, SOL balance, token accounts. Use it before interacting with an unknown address, or to check whether a token contract is a proxy.
 
 ## Aave v3 (lending)
 
@@ -186,6 +191,7 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 ## Recipes
 
 - "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`); works for 0x and Solana addresses. Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
+- "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
 - "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.
 - Anything chainq lacks a command for — `chainq rpc <method> [params...]` (EVM or Solana methods).

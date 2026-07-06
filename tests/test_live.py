@@ -29,6 +29,7 @@ SMOKE = {
     "aerodrome": ["protocols", "aerodrome", "stats"],
     "solana-gas": ["gas", "-n", "solana"],
     "solana-balance": ["balance", "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "-n", "solana"],
+    "address-eoa": ["address", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"],
 }
 
 

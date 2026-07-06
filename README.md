@@ -91,6 +91,8 @@ chainq balance 9WzDX... -n solana --coin usdc         # SOL and SPL token balanc
 chainq portfolio vitalik.eth                          # all networks: native + known tokens, USD total
 chainq portfolio 9WzDX...                             # Solana wallets: SOL + every SPL token account
 chainq portfolio 0x... --defi --hide-unpriced         # fold in Hyperliquid perp+spot; drop dust/unpriced
+chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
+chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
 chainq tx 5Ufd... -n solana                           # Solana signature lookup
