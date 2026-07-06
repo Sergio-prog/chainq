@@ -18,28 +18,24 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 - **v0.10** — stablecoins: `stables` overview (mcap ranking, peg price, supply changes via DefiLlama stablecoins API), `sky rate` (SSR + legacy DSR read onchain), `ethena yield` (sUSDe APY via official API, USDe supply/peg).
 - **v0.11** — `portfolio`: parallel sweep of native + registry tokens across all 25 networks with one batched CoinGecko pricing call, sorted by USD value; `--min-usd` dust filter, `-n` repeatable network filter.
 - **v0.12** — historical data (`candles <asset> --days N` OHLC, `price --at DATE`, `hl funding --history`); `portfolio --defi` folds in Hyperliquid perp equity + spot balances, plus `--hide-unpriced`; new protocols Lido (`lido apr`) and Aerodrome (`aerodrome stats/pools`); more filters (`hl spot balances --min-usd`, `stables --min-mcap`); structured JSON errors (`{"error": ...}` on stdout in `--json` mode); CHANGELOG generated from conventional commits; live smoke-test suite (`pytest -m live`).
+- **v0.13** — Solana read-only support (SOL/SPL `balance`, `portfolio` sweeps all token accounts in one call, `tx` by signature, `gas` with priority fees, raw `rpc`; base58 addresses auto-route); `chainq address` intelligence (EOA vs contract vs program, EIP-1967/1167/ZeppelinOS proxy resolution, EIP-7702 delegation, ERC-20 profile, holdings, reverse ENS); Curve (`curve pools/stats` via official API, 13 chains); Multicall3 batching everywhere onchain (portfolio = 1 eth_call per network, uniswap `pool` = 3 batched roundtrips).
 
 ## Next
 
 - **Release channels** — done since v0.11.0: tag-triggered workflow publishes to PyPI (trusted publishing, GitHub release with attestations) and bumps the Homebrew formula in [Sergio-prog/homebrew-tap](https://github.com/Sergio-prog/homebrew-tap) via `TAP_GITHUB_TOKEN`. npm launcher (`npm/`) is parked: the registry rejects unscoped `chainq` as too similar to `chai`; revisit with a scoped name or an npm support request.
-- **Portfolio depth, part 2** — Hyperliquid folding shipped in v0.12; still to do: Aave/Morpho supplied positions (onchain aToken / UiPoolDataProvider reads or protocol user endpoints), and auto token lists per network from CoinGecko (top ~50 by mcap, cached daily) so the sweep catches far more than the curated registry.
-- **Gas across all networks** — `gas --all`: one parallel sweep (reuse the portfolio executor) answering "where is it cheapest to transact right now".
-- **Solana** — read-only first pass: SOL balance, SPL token accounts with USD values, prices already work via CoinGecko. Biggest missing chain; needs its own RPC pool (no web3.py).
+- **Portfolio depth, part 2** — Hyperliquid folding shipped in v0.12; still to do: Aave/Morpho supplied positions (onchain aToken / UiPoolDataProvider reads or protocol user endpoints), and auto token lists per network from CoinGecko (top ~50 by mcap, cached daily) so the sweep catches far more than the curated registry. Solana portfolio pricing for long-tail mints (DexScreener batch lookup) would fold in here too.
 
 ## Later
 
-- Address intelligence: `chainq address 0x...` — contract vs EOA, deploy date, tx count, verified source, token/NFT holdings summary.
+- Address intelligence depth: deploy date and verified source for contracts (needs explorer APIs), NFT holdings summary.
 - Generic ERC-4626 inspector: `chainq vault 0xADDR -n base` — asset, share price, APY from share-price delta, TVL; covers thousands of yield vaults with zero per-protocol work.
 - NFT: wallet holdings and collection-by-contract-address lookup (both need a valid OpenSea key), floor cross-check via a second marketplace.
 - CEX spot prices via ccxt as a CoinGecko alternative/cross-check.
-- More protocols: Curve pools, bridge status (Lido stETH APR and Aerodrome shipped in v0.12).
+- More protocols: bridge status (Curve shipped in v0.13; Lido and Aerodrome in v0.12).
 - Watch/stream mode (`chainq gas --watch`) and threshold alerts (reuse PriceAlerts bot).
 - Thin MCP wrapper over the CLI if demand appears from non-shell agents.
 
 ## Engineering improvements
 
-- Multicall3 batching for `portfolio` and `uniswap pool` — one `eth_call` per network instead of one per token/tier; Multicall3 is deployed at the same address on all 25 networks.
 - Wire the live smoke-test suite (`pytest -m live`, shipped in v0.12) into a weekly scheduled CI job to catch upstream API drift.
 - Cross-platform check: Windows terminal output (the banner and `…` glyphs) and CI matrix entry.
-
-Shipped in v0.12: structured `--json` error output, CHANGELOG from conventional commits, live smoke-test suite.

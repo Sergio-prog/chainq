@@ -2,7 +2,7 @@
 
 **One CLI for the crypto world — built for AI agents, pleasant for humans.**
 
-Query asset prices, wallet balances, gas, transactions, raw EVM RPC, Aave markets, and Hyperliquid perps from a single tool. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
+Query asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols (Aave, Uniswap, Curve, Morpho, Pendle...), and Hyperliquid perps from a single tool. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
 
 ```console
 $ chainq price eth btc hype
@@ -209,7 +209,7 @@ No skill installed? Agents can self-discover everything via `chainq -h` and `cha
 
 ## Roadmap
 
-NFT floors, Uniswap pools, stablecoin protocols (Sky, Ethena), portfolio sweep, Solana, and more — see [ROADMAP.md](ROADMAP.md).
+ERC-4626 vault inspector, DeFi positions in portfolio, CEX prices, and more — see [ROADMAP.md](ROADMAP.md).
 
 ## Development
 
