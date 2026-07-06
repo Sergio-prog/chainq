@@ -2,7 +2,15 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
-## Unreleased
+## v0.12.1
+
+### Fixes
+- detect homebrew installs in chainq update
+
+## v0.12.0
+
+### Features
+- historical data, portfolio depth, lido/aerodrome, structured errors
 
 ### Fixes
 - brew formula installs via python -m pip
