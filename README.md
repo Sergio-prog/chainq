@@ -81,20 +81,23 @@ chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, l
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
 
-### Onchain (EVM)
+### Onchain (EVM + Solana)
 
 ```bash
 chainq networks                                       # supported networks and aliases
 chainq balance vitalik.eth                            # native balance, ENS supported
 chainq balance 0x... --coin usdt -n arbitrum          # ERC-20 by symbol or contract address
+chainq balance 9WzDX... -n solana --coin usdc         # SOL and SPL token balances
 chainq portfolio vitalik.eth                          # all networks: native + known tokens, USD total
+chainq portfolio 9WzDX...                             # Solana wallets: SOL + every SPL token account
 chainq portfolio 0x... --defi --hide-unpriced         # fold in Hyperliquid perp+spot; drop dust/unpriced
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
-chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch
+chainq tx 5Ufd... -n solana                           # Solana signature lookup
+chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch (getSlot on solana)
 ```
 
-25 networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — by key, alias (`eth`, `arb`, `op`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
+25 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 
 ### Protocols
 

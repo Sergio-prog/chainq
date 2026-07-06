@@ -60,6 +60,10 @@ SYMBOL_TO_ID = {
     "jup": "jupiter-exchange-solana",
     "wif": "dogwifcoin",
     "bonk": "bonk",
+    "wsol": "wrapped-solana",
+    "msol": "msol",
+    "jitosol": "jito-staked-sol",
+    "crvusd": "crvusd",
 }
 
 
@@ -112,6 +116,7 @@ PLATFORM_IDS = {
     "monad": "monad",
     "plasma": "plasma",
     "katana": "katana",
+    "solana": "solana",
 }
 
 CONTRACT_LOOKUP_ORDER = ("ethereum", "base", "arbitrum", "bsc", "polygon", "optimism", "avalanche", "hyperevm")

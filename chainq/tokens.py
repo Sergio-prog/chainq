@@ -1,5 +1,6 @@
 from chainq.errors import ChainqError
 from chainq.networks import Network
+from chainq.solana import is_solana_address
 
 TOKENS: dict[str, dict[str, str]] = {
     "ethereum": {
@@ -72,8 +73,31 @@ TOKENS: dict[str, dict[str, str]] = {
     },
 }
 
+SOLANA_TOKENS: dict[str, str] = {
+    "usdc": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "usdt": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "wsol": "So11111111111111111111111111111111111111112",
+    "jup": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "bonk": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "wif": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    "msol": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+    "jitosol": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+}
+
+MINT_TO_SYMBOL: dict[str, str] = {mint: symbol for symbol, mint in SOLANA_TOKENS.items()}
+
 
 def resolve_token(coin: str, network: Network) -> str:
+    if network.kind == "solana":
+        mint = SOLANA_TOKENS.get(coin.strip().lower())
+        if mint is not None:
+            return mint
+        if is_solana_address(coin.strip()):
+            return coin.strip()
+        known = ", ".join(sorted(SOLANA_TOKENS))
+        raise ChainqError(
+            f"unknown token '{coin}' on {network.name} (known symbols: {known}); pass the mint address instead"
+        )
     if coin.startswith("0x") and len(coin) == 42:
         return coin
     address = TOKENS.get(network.key, {}).get(coin.strip().lower())

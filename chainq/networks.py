@@ -13,6 +13,7 @@ class Network:
     rpc_urls: tuple[str, ...]
     explorer: str
     aliases: tuple[str, ...] = ()
+    kind: str = "evm"
 
 
 NETWORKS: dict[str, Network] = {
@@ -293,6 +294,20 @@ NETWORKS: dict[str, Network] = {
             native_coingecko_id="ethereum",
             rpc_urls=("https://rpc.katana.network",),
             explorer="https://explorer.katanarpc.com",
+        ),
+        Network(
+            key="solana",
+            name="Solana",
+            chain_id=101,
+            native_symbol="SOL",
+            native_coingecko_id="solana",
+            rpc_urls=(
+                "https://api.mainnet-beta.solana.com",
+                "https://solana-rpc.publicnode.com",
+            ),
+            explorer="https://solscan.io",
+            aliases=("sol",),
+            kind="solana",
         ),
     )
 }

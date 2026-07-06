@@ -48,9 +48,9 @@ Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 
 
 Prefer `price` for "how much is X"; use `asset` when the user wants depth (supply, FDV, ATH). If a symbol is ambiguous or unknown, run `search` first and use the returned id.
 
-## Onchain (EVM)
+## Onchain (EVM + Solana)
 
-25 networks: ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype...), or chain ids. Default is ethereum. `chainq networks` lists all.
+25 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana) plus solana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype, sol...), or chain ids. Default is ethereum. `chainq networks` lists all.
 
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
@@ -67,6 +67,21 @@ chainq rpc eth_getBlockByNumber latest false                  # params: JSON lit
 ```
 
 Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value. Registry-token reads are batched via Multicall3, so `portfolio` is one RPC call per network.
+
+### Solana
+
+Base58 addresses route to Solana automatically in `balance`, `portfolio`, and `address` — no flag needed; other commands take `-n solana` (alias `sol`).
+
+```bash
+chainq balance 9WzDX... -n solana                             # SOL balance
+chainq balance 9WzDX... -n sol --coin usdc                    # SPL token by symbol (usdc, usdt, jup, bonk, wif, msol, jitosol) or mint
+chainq portfolio 9WzDX...                                     # SOL + EVERY SPL token account (one RPC call); unknown mints show unpriced
+chainq portfolio 9WzDX... --hide-unpriced                     # recommended for busy wallets: drops spam mints
+chainq address 9WzDX...                                       # wallet vs program, owner program, token account count
+chainq tx 5UfDuX94A1Qfq... -n solana                          # by signature: status, signer, fee, slot
+chainq gas -n solana                                          # base fee + median priority fee, transfer cost USD
+chainq rpc getSlot -n solana                                  # raw Solana JSON-RPC
+```
 
 ## Aave v3 (lending)
 
@@ -170,7 +185,7 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 
 ## Recipes
 
-- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`). Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`); works for 0x and Solana addresses. Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
-- "Did my tx go through?" — `tx 0xHASH -n <network>`; check `status` and quote the explorer link from `-v`.
-- Anything chainq lacks a command for on EVM — `chainq rpc <method> [params...]`.
+- "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.
+- Anything chainq lacks a command for — `chainq rpc <method> [params...]` (EVM or Solana methods).

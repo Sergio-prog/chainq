@@ -27,6 +27,8 @@ SMOKE = {
     "ethena": ["protocols", "ethena", "yield"],
     "lido": ["protocols", "lido", "apr"],
     "aerodrome": ["protocols", "aerodrome", "stats"],
+    "solana-gas": ["gas", "-n", "solana"],
+    "solana-balance": ["balance", "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "-n", "solana"],
 }
 
 
