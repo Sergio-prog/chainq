@@ -102,6 +102,8 @@ def _upgrade_command() -> list[str]:
         return ["uv", "tool", "upgrade", "chainq"]
     if "pipx" in prefix and shutil.which("pipx"):
         return ["pipx", "upgrade", "chainq"]
+    if "/Cellar/" in prefix and shutil.which("brew"):
+        return ["brew", "upgrade", "chainq"]
     raise ChainqError(
         "could not detect how chainq was installed; reinstall with the install script or `uv tool install chainq`"
     )
@@ -118,6 +120,8 @@ def update(force: Annotated[bool, typer.Option("--force", help="reinstall even i
     cmd = _upgrade_command()
     if force and cmd[:3] == ["uv", "tool", "upgrade"]:
         cmd = ["uv", "tool", "upgrade", "--reinstall", "chainq"]
+    if force and cmd[:2] == ["brew", "upgrade"]:
+        cmd = ["brew", "reinstall", "chainq"]
     print(f"running: {' '.join(cmd)}")
     result = subprocess.run(cmd)
     if result.returncode != 0:
