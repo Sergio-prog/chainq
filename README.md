@@ -1,4 +1,4 @@
-# chainq
+# ⛓️ chainq
 
 **One CLI for the crypto world — built for AI agents, pleasant for humans.**
 
