@@ -175,8 +175,8 @@ def _priced(assets: list[dict]) -> list[dict]:
 
 def _resolve_scan_target(address: str, networks: list[str] | None) -> tuple[str, list[str]]:
     value = address.strip()
-    if solana.is_solana_address(value) and not value.lower().endswith(".eth"):
-        kind, addr = "solana", value
+    if solana.looks_like_solana(value):
+        kind, addr = "solana", solana.resolve_solana_address(value)
     else:
         kind, addr = "evm", resolve_address(value)
     if networks:
@@ -192,7 +192,7 @@ def _resolve_scan_target(address: str, networks: list[str] | None) -> tuple[str,
 
 
 def portfolio(
-    address: Annotated[str, typer.Argument(help="wallet address (0x or Solana base58) or ENS name")],
+    address: Annotated[str, typer.Argument(help="wallet address (0x or Solana base58), ENS, or .sol name")],
     networks: Annotated[
         list[str] | None, typer.Option("--network", "-n", help="network(s) to scan; default: all")
     ] = None,

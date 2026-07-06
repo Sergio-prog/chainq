@@ -71,9 +71,10 @@ Known token symbols per network are listed in the `balance` error message if a s
 
 ### Solana
 
-Base58 addresses route to Solana automatically in `balance`, `portfolio`, and `address` — no flag needed; other commands take `-n solana` (alias `sol`).
+Base58 addresses, `.sol` domains (SNS), and base58 tx signatures route to Solana automatically in `balance`, `portfolio`, `address`, and `tx` — no flag needed; other commands take `-n solana` (alias `sol`).
 
 ```bash
+chainq balance toly.sol                                       # .sol domains resolve everywhere an address is accepted
 chainq balance 9WzDX... -n solana                             # SOL balance
 chainq balance 9WzDX... -n sol --coin usdc                    # SPL token by symbol (usdc, usdt, jup, bonk, wif, msol, jitosol) or mint
 chainq portfolio 9WzDX...                                     # SOL + EVERY SPL token account (one RPC call); unknown mints show unpriced
@@ -201,7 +202,7 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 
 ## Recipes
 
-- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`); works for 0x and Solana addresses. Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
 - "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
 - "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.

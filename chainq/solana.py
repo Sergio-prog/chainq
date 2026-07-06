@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import os
 from decimal import Decimal
 
@@ -11,6 +13,9 @@ LAMPORTS_PER_SOL = 10**9
 BASE_FEE_LAMPORTS = 5000
 TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+NAME_PROGRAM_ID = "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX"
+SOL_TLD_AUTHORITY = "58PwtjSDuFHuUkYjH9BYnnQKHfwo9reZhC2zMJv9JPkx"
+SNS_PROXY_URL = "https://sns-sdk-proxy.bonfida.workers.dev"
 
 _BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 _BASE58_INDEX = {c: i for i, c in enumerate(_BASE58_ALPHABET)}
@@ -28,6 +33,63 @@ def base58_decode(value: str) -> bytes:
     return b"\x00" * pad + raw
 
 
+def base58_encode(raw: bytes) -> str:
+    num = int.from_bytes(raw, "big")
+    encoded = ""
+    while num:
+        num, rem = divmod(num, 58)
+        encoded = _BASE58_ALPHABET[rem] + encoded
+    pad = len(raw) - len(raw.lstrip(b"\x00"))
+    return "1" * pad + encoded
+
+
+_ED25519_P = 2**255 - 19
+_ED25519_D = (-121665 * pow(121666, _ED25519_P - 2, _ED25519_P)) % _ED25519_P
+
+
+def _is_on_curve(point: bytes) -> bool:
+    y = int.from_bytes(point, "little") & ((1 << 255) - 1)
+    if y >= _ED25519_P:
+        return False
+    y2 = y * y % _ED25519_P
+    x2 = (y2 - 1) * pow(_ED25519_D * y2 + 1, _ED25519_P - 2, _ED25519_P) % _ED25519_P
+    return x2 == 0 or pow(x2, (_ED25519_P - 1) // 2, _ED25519_P) == 1
+
+
+def find_program_address(seeds: list[bytes], program_id: str) -> str:
+    for bump in range(255, -1, -1):
+        data = b"".join(seeds) + bytes([bump]) + base58_decode(program_id) + b"ProgramDerivedAddress"
+        digest = hashlib.sha256(data).digest()
+        if not _is_on_curve(digest):
+            return base58_encode(digest)
+    raise ChainqError(f"no valid program-derived address for {program_id}")
+
+
+def sns_domain_key(domain: str) -> str:
+    hashed = hashlib.sha256(b"SPL Name Service" + domain.encode()).digest()
+    return find_program_address([hashed, b"\x00" * 32, base58_decode(SOL_TLD_AUTHORITY)], NAME_PROGRAM_ID)
+
+
+def resolve_sol_domain(name: str) -> str:
+    domain = name.strip().lower().removesuffix(".sol")
+    try:
+        resp = http.get(f"{SNS_PROXY_URL}/resolve/{domain}")
+        if resp.status_code < 400:
+            payload = resp.json()
+            if payload.get("s") == "ok" and is_solana_address(payload.get("result") or ""):
+                return payload["result"]
+            if payload.get("result") == "Domain not found":
+                raise ChainqError(f"could not resolve SNS domain '{name}' (not registered)")
+    except ChainqError:
+        raise
+    except Exception:
+        pass
+    data = account_data(sns_domain_key(domain))
+    if data is None or len(data) < 64:
+        raise ChainqError(f"could not resolve SNS domain '{name}'")
+    return base58_encode(data[32:64])
+
+
 def is_solana_address(value: str) -> bool:
     if not 32 <= len(value) <= 44:
         return False
@@ -39,9 +101,18 @@ def is_solana_address(value: str) -> bool:
 
 def resolve_solana_address(value: str) -> str:
     value = value.strip()
+    if value.lower().endswith(".sol"):
+        return resolve_sol_domain(value)
     if not is_solana_address(value):
-        raise ChainqError(f"invalid Solana address '{value}' (expected a base58-encoded 32-byte pubkey)")
+        raise ChainqError(f"invalid Solana address '{value}' (expected a base58 pubkey or .sol domain)")
     return value
+
+
+def looks_like_solana(value: str) -> bool:
+    value = value.strip()
+    if value.lower().endswith(".sol"):
+        return True
+    return not value.lower().endswith(".eth") and is_solana_address(value)
 
 
 def network() -> Network:
@@ -115,6 +186,13 @@ def token_balance(owner: str, mint: str) -> dict | None:
 
 def account_info(pubkey: str) -> dict | None:
     return rpc_call("getAccountInfo", [pubkey, {"encoding": "jsonParsed"}]).get("value")
+
+
+def account_data(pubkey: str) -> bytes | None:
+    value = rpc_call("getAccountInfo", [pubkey, {"encoding": "base64"}]).get("value")
+    if value is None:
+        return None
+    return base64.b64decode(value["data"][0])
 
 
 def get_transaction(signature: str) -> dict | None:

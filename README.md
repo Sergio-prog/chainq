@@ -86,6 +86,7 @@ chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```bash
 chainq networks                                       # supported networks and aliases
 chainq balance vitalik.eth                            # native balance, ENS supported
+chainq balance toly.sol                               # .sol domains too (SNS), auto-routed to Solana
 chainq balance 0x... --coin usdt -n arbitrum          # ERC-20 by symbol or contract address
 chainq balance 9WzDX... -n solana --coin usdc         # SOL and SPL token balances
 chainq portfolio vitalik.eth                          # all networks: native + known tokens, USD total

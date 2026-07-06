@@ -88,7 +88,7 @@ def _solana_balance(address: str, coin: str | None, net) -> tuple[str, Decimal, 
 
 
 def balance(
-    address: Annotated[str, typer.Argument(help="wallet address (0x or Solana base58) or ENS name")],
+    address: Annotated[str, typer.Argument(help="wallet address (0x or Solana base58), ENS, or .sol name")],
     coin: Annotated[
         str | None, typer.Option("--coin", "-c", help="token symbol or contract/mint address; omit for native")
     ] = None,
@@ -101,6 +101,8 @@ def balance(
     """Get native or token balance of an address."""
     out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
+    if net.kind != "solana" and solana.looks_like_solana(address):
+        net = resolve_network("solana")
     if net.kind == "solana":
         addr, amount, symbol, token_address, price = _solana_balance(address, coin, net)
         rpc_note = "solana rpc"
@@ -274,6 +276,8 @@ def tx(
     """Look up a transaction: status, parties, value, fee, block."""
     out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
+    if net.kind != "solana" and solana.is_signature(tx_hash.strip()):
+        net = resolve_network("solana")
     if net.kind == "solana":
         return _solana_tx(out, tx_hash, net)
     client = connect(net)

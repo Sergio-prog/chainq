@@ -232,7 +232,7 @@ def _solana_address(out: Out, target: str, net) -> None:
 
 
 def address(
-    target: Annotated[str, typer.Argument(help="address (0x or Solana base58) or ENS name")],
+    target: Annotated[str, typer.Argument(help="address (0x or Solana base58), ENS, or .sol name")],
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -242,7 +242,7 @@ def address(
     """Inspect an address: EOA vs contract vs program, proxies, activity, holdings."""
     out = Out(json_out, quiet, verbose, format)
     value = target.strip()
-    if solana.is_solana_address(value) and not value.lower().endswith(".eth"):
+    if solana.looks_like_solana(value):
         net = resolve_network("solana")
         return _solana_address(out, value, net)
     net = resolve_network(network)

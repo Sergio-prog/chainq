@@ -2,7 +2,15 @@ import pytest
 
 from chainq.errors import ChainqError
 from chainq.networks import resolve_network
-from chainq.solana import base58_decode, is_signature, is_solana_address, resolve_solana_address
+from chainq.solana import (
+    base58_decode,
+    base58_encode,
+    is_signature,
+    is_solana_address,
+    looks_like_solana,
+    resolve_solana_address,
+    sns_domain_key,
+)
 from chainq.tokens import SOLANA_TOKENS, resolve_token
 
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -51,3 +59,19 @@ def test_resolve_token_unknown():
 def test_all_mints_are_valid_pubkeys():
     for mint in SOLANA_TOKENS.values():
         assert is_solana_address(mint)
+
+
+def test_base58_roundtrip():
+    assert base58_encode(base58_decode(USDC_MINT)) == USDC_MINT
+    assert base58_encode(b"\x00" * 32) == "1" * 32
+
+
+def test_sns_domain_key():
+    assert sns_domain_key("toly") == "FX1APjKbFu6M8GKb3dGXcZLXjxX4fGaYwvHqb5Vaee8q"
+
+
+def test_looks_like_solana():
+    assert looks_like_solana("toly.sol")
+    assert looks_like_solana(USDC_MINT)
+    assert not looks_like_solana("vitalik.eth")
+    assert not looks_like_solana("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
