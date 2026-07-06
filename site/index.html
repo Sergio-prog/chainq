@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>chainq — one CLI for the crypto world</title>
+    <meta name="description" content="Query prices, balances, gas, DeFi protocols and perps from one CLI. Built for AI agents, pleasant for humans. Zero setup, no API keys." />
+    <meta property="og:title" content="chainq — one CLI for the crypto world" />
+    <meta property="og:description" content="Prices, balances, gas, Aave, Uniswap, Hyperliquid and more from a single command. Built for AI agents." />
+    <meta property="og:image" content="/og.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <span class="wordmark"><span class="wordmark-prompt">$</span> chainq<span class="wordmark-cursor"></span></span>
+      <nav class="nav-links">
+        <a href="https://github.com/Sergio-prog/chainq#commands" target="_blank" rel="noopener">Commands</a>
+        <a href="https://github.com/Sergio-prog/chainq/blob/main/ROADMAP.md" target="_blank" rel="noopener">Roadmap</a>
+        <a class="nav-gh" href="https://github.com/Sergio-prog/chainq" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="hero">
+      <div class="hero-copy">
+        <h1>One CLI for the <em data-text="crypto world">crypto world</em></h1>
+        <p class="hero-sub">
+          Built for AI agents, pleasant for humans. Prices, balances, gas, transactions,
+          lending markets, DEX pools, perps and NFT floors across 25 EVM networks and
+          Solana — every command speaks text, <code>--json</code>, tables or token-cheap
+          <code>toon</code>. Zero setup, no API keys.
+        </p>
+        <div class="install">
+          <div class="src-tabs" role="tablist" aria-label="Install method" id="src-tabs"></div>
+          <div class="install-line">
+            <code id="install-cmd"></code>
+            <button class="copy-btn" id="install-copy" aria-label="Copy install command">copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="terminal" role="img" aria-label="Terminal running chainq commands with live crypto data">
+        <div class="terminal-bar">
+          <span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span>
+          <span class="terminal-title">chainq — zsh</span>
+        </div>
+        <div class="terminal-body" id="terminal-body"></div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span class="footer-skill">
+        teach your agent:&nbsp;<code>npx skills add Sergio-prog/chainq</code>
+        <button class="copy-btn ghost" data-copy="npx skills add Sergio-prog/chainq" aria-label="Copy skill install command">copy</button>
+      </span>
+      <span class="footer-note">
+        <a href="/llms.txt">llms.txt</a>
+        <span class="dot">·</span> <a href="/llms-full.txt">llms-full.txt</a>
+      </span>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

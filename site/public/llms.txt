@@ -1,0 +1,23 @@
+# chainq
+
+> Agent-first CLI for onchain and crypto market data. One command queries asset prices (spot, historical, OHLC candles), wallet balances and portfolios on 25 EVM networks + Solana, gas, transactions, raw JSON-RPC, address inspection, lending and yield rates (Aave, Morpho, Pendle, Sky, Ethena, Lido), DEX pools (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps and prediction markets, NFT floors, stablecoin pegs, and DefiLlama TVL. Zero setup, no API keys.
+
+Install: `curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh` (or `brew install sergio-prog/tap/chainq`, `uv tool install chainq`, `pipx install chainq`). Requires Python 3.12+ (the script bootstraps uv).
+
+Teach an agent to use it: `npx skills add Sergio-prog/chainq` — or agents can self-discover everything via `chainq -h` and `chainq <command> -h`.
+
+Output contract: every command supports `--json` (structured), `-q` (bare value), `-v` (provenance), and `--format text|json|table|toon` (`toon` is a compact tabular encoding using ~2-3x fewer tokens than JSON). Errors go to stderr with exit code 1; in `--json` mode errors print `{"error": "..."}` to stdout instead.
+
+## Docs
+
+- [Full command reference](/llms-full.txt): every command with examples and usage guidance for agents
+- [README](https://raw.githubusercontent.com/Sergio-prog/chainq/main/README.md): overview, install, commands, configuration
+- [Agent skill](https://raw.githubusercontent.com/Sergio-prog/chainq/main/skills/chainq/SKILL.md): the Claude Code / agent skill definition
+- [ROADMAP](https://raw.githubusercontent.com/Sergio-prog/chainq/main/ROADMAP.md): vision, shipped versions, what's next
+- [CHANGELOG](https://raw.githubusercontent.com/Sergio-prog/chainq/main/CHANGELOG.md): release notes per version
+
+## Optional
+
+- [GitHub repository](https://github.com/Sergio-prog/chainq): source, issues, MIT license
+- [PyPI package](https://pypi.org/project/chainq/): published releases
+- [Homebrew tap](https://github.com/Sergio-prog/homebrew-tap): formula for brew installs

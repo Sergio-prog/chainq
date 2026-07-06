@@ -1,0 +1,213 @@
+# chainq — full reference
+
+> Agent-first CLI for onchain and crypto market data. No API keys or setup needed for any command below; curated public RPC endpoints with automatic fallback are built in. This file contains the complete command reference with usage guidance for agents.
+
+## Install
+
+- One-liner: `curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh`
+- Homebrew: `brew install sergio-prog/tap/chainq`
+- uv: `uv tool install chainq` / pipx: `pipx install chainq`
+- Requires Python 3.12+ (the install script bootstraps uv). Update with `chainq update`.
+- Teach an agent: `npx skills add Sergio-prog/chainq` installs the chainq skill.
+
+## Output rules
+
+- Default output is one human-readable line per result — safe to show the user as-is.
+- Add `--json` to any command for structured output you need to parse or compute over.
+- Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
+- `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
+- Errors: stderr + exit code 1. In `--json`/`--format json` mode the error is instead printed to stdout as `{"error": "..."}` (still exit 1) so you can branch on it without reading stderr. A CoinGecko rate-limit error means wait ~1 minute (or `chainq config set coingecko-api-key <key>`); RPC commands are not affected by it.
+- Persistent settings (API keys, custom RPCs, timeouts): `chainq config set/get/list/unset` — no manual .env editing needed.
+
+## Market data (CoinGecko)
+
+```bash
+chainq price eth btc hype          # spot price, 24h change, mcap; accepts symbols or coingecko ids
+chainq price 0xTokenAddress        # by contract address (any chain; -n hints the network)
+chainq trending -l 10              # trending tokens right now
+chainq asset ethena                # full profile: price, mcap/fdv, supply, ATH, links
+chainq asset 0xTokenAddress -n base
+chainq search "sky protocol"       # resolve fuzzy names to ids for price/asset
+chainq price btc eth --at 2025-03-01  # historical price on a date (within the last 365 days)
+chainq candles btc --days 30          # OHLC candles; granularity auto-scales (30d → 4h candles)
+chainq candles eth -d 7 -l 24 --json  # last 24 candles as JSON; -d window, -l caps rows shown
+```
+
+Contract addresses work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only). Historical `--at`/`candles` need a CoinGecko-listed asset (symbol, id, or contract), and the public API only covers the last 365 days.
+
+## Stablecoins
+
+```bash
+chainq stables                             # ranked by mcap: peg price, 7d supply change, mechanism
+chainq stables usde                        # one stablecoin (or filter by name)
+chainq stables -m crypto-backed            # filter: fiat-backed | crypto-backed | algorithmic
+chainq stables --min-mcap 1000000000       # hide stablecoins below a market cap floor
+chainq protocols sky rate                  # Sky Savings Rate (sUSDS) + legacy DSR, read onchain
+chainq protocols ethena yield              # sUSDe APY (current + 30d/90d avg), USDe supply and peg
+chainq protocols lido apr                  # stETH staking APR (7d SMA), TVL, wstETH/stETH rate
+```
+
+Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 1.0. "Where to park stables" questions: compare `sky rate`, `ethena yield`, and lending APYs from aave/morpho.
+
+Prefer `price` for "how much is X"; use `asset` when the user wants depth (supply, FDV, ATH). If a symbol is ambiguous or unknown, run `search` first and use the returned id.
+
+## Onchain (EVM + Solana)
+
+25 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana) plus solana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype, sol...), or chain ids. Default is ethereum. `chainq networks` lists all.
+
+```bash
+chainq balance vitalik.eth                                    # native balance, ENS ok
+chainq portfolio vitalik.eth                                  # sweep ALL networks: native + known tokens, USD total
+chainq portfolio 0x... -n ethereum -n base --min-usd 1        # restrict networks, hide dust below $1
+chainq portfolio 0x... --hide-unpriced                        # also drop tokens with no known USD price
+chainq portfolio 0x... --defi                                 # fold in Hyperliquid perp equity + spot balances
+chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol
+chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
+chainq address 0xADDR -n base                                 # what IS this: EOA vs contract, proxy impl, holdings
+chainq gas -n base                                            # gas price, base fee, transfer cost in USD
+chainq tx 0xHASH -n ethereum                                  # status, parties, value, fee, block
+chainq rpc eth_blockNumber -n optimism                        # raw JSON-RPC escape hatch, prints JSON
+chainq rpc eth_getBlockByNumber latest false                  # params: JSON literals parsed, rest strings
+```
+
+Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value. Registry-token reads are batched via Multicall3, so `portfolio` is one RPC call per network.
+
+### Solana
+
+Base58 addresses, `.sol` domains (SNS), and base58 tx signatures route to Solana automatically in `balance`, `portfolio`, `address`, and `tx` — no flag needed; other commands take `-n solana` (alias `sol`).
+
+```bash
+chainq balance toly.sol                                       # .sol domains resolve everywhere an address is accepted
+chainq balance 9WzDX... -n solana                             # SOL balance
+chainq balance 9WzDX... -n sol --coin usdc                    # SPL token by symbol (usdc, usdt, jup, bonk, wif, msol, jitosol) or mint
+chainq portfolio 9WzDX...                                     # SOL + EVERY SPL token account (one RPC call); unknown mints show unpriced
+chainq portfolio 9WzDX... --hide-unpriced                     # recommended for busy wallets: drops spam mints
+chainq address 9WzDX...                                       # wallet vs program, owner program, token account count
+chainq tx 5UfDuX94A1Qfq... -n solana                          # by signature: status, signer, fee, slot
+chainq gas -n solana                                          # base fee + median priority fee, transfer cost USD
+chainq rpc getSlot -n solana                                  # raw Solana JSON-RPC
+```
+
+## Address intelligence
+
+`chainq address <addr>` answers "what is this address?" on any network: EOA vs contract (with EIP-7702 delegation detection), proxy resolution (EIP-1967/1167/ZeppelinOS → implementation address), ERC-20 token profile (name, symbol, decimals, supply), tx count, native + registry token holdings with USD values, reverse ENS on ethereum, explorer link. On Solana: wallet vs program, owner program, SOL balance, token accounts. Use it before interacting with an unknown address, or to check whether a token contract is a proxy.
+
+## Aave v3 (lending)
+
+```bash
+chainq protocols aave markets -n ethereum        # reserves ranked by size: supply/borrow APY, utilization
+chainq protocols aave markets -c usdc -n base    # one asset (all markets on the chain)
+chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy | borrow-apy | utilization
+```
+
+"Best yield on USDC" type questions: run `protocols aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
+
+## Uniswap
+
+```bash
+chainq protocols uniswap pool weth usdc -n ethereum      # ONCHAIN pool state, all of v2+v3+v4 per fee tier
+chainq protocols uniswap pool eth usdc -V v4             # 'eth' = native currency (v4 pools use it); -V v2|v3|v4|all
+chainq protocols uniswap pool weth usdc --fee 500        # one fee tier (100 | 500 | 3000 | 10000)
+chainq protocols uniswap pool 0xPoolAddress              # single pool/pair address, v2/v3 auto-detected
+chainq protocols uniswap pools "weth usdc" -n ethereum   # discovery via indexer: 24h vol, liquidity
+chainq protocols uniswap pools usdc -n base -s volume    # all pools for one token; sort: liquidity | volume
+chainq protocols uniswap stats                           # protocol TVL + 24h/7d/30d volume
+```
+
+`pool` (singular) reads factory/pool/StateView contracts directly — authoritative prices and reserves (v4 reports price + in-range liquidity, no reserves; its biggest pools use native 'eth', not weth). `pools` (plural) uses DexScreener for discovery/ranking (symbols resolve through the built-in token registry; prefer addresses for long-tail tokens). Thin low-liquidity tiers can show stale prices — compare across tiers/versions.
+
+## Curve
+
+```bash
+chainq protocols curve pools -n ethereum -l 10           # top pools by TVL: coins, 24h volume, base + CRV APY
+chainq protocols curve pools -c usdc -s volume           # filter by coin/name; sort: tvl | volume | apy
+chainq protocols curve pools -n arbitrum --min-tvl 1e6   # 13 chains: ethereum, arbitrum, base, optimism, ...
+chainq protocols curve stats                             # protocol TVL, 24h volume/fees, crvUSD TVL, CRV price
+```
+
+`apy_base_pct` is the swap-fee APY; `apy_crv_min/max_pct` is the CRV gauge emission range (max = fully boosted). Pool data from Curve's official API.
+
+## Aerodrome (Base DEX)
+
+```bash
+chainq protocols aerodrome stats                  # protocol TVL (AMM + Slipstream CL), 24h volume, fees, AERO price
+chainq protocols aerodrome pools -l 10            # top pools by TVL, with swap-fee vs emission APY split
+chainq protocols aerodrome pools -p cl --min-tvl 1000000   # -p all|v1(amm)|cl(slipstream), hide small pools
+```
+
+APY split: `apy_base_pct` is the swap-fee yield, `apy_reward_pct` is AERO emissions. Pool/volume/fee data via DefiLlama, AERO price via CoinGecko.
+
+## Pendle (yields)
+
+```bash
+chainq protocols pendle markets -n ethereum              # active markets: implied APY, LP APY, liquidity, expiry
+chainq protocols pendle markets -c usde -s implied-apy   # filter by name; sort: liquidity | implied-apy | expiry
+```
+
+"Fixed yield on X" questions: implied APY is the fixed rate you lock by buying PT. Filter with `-c` and compare `implied_apy_pct` from `--json`.
+
+## Morpho (lending)
+
+```bash
+chainq protocols morpho markets -n base -c usdc          # markets: supply/borrow APY, lltv, utilization
+chainq protocols morpho markets -s borrow-apy            # sort: supplied | supply-apy | borrow-apy | utilization
+chainq protocols morpho vaults -c usdc                   # curated vaults: APY (gross + net), TVL
+```
+
+## DefiLlama (any protocol/chain)
+
+```bash
+chainq protocols llama protocol lido                     # TVL, chains, fees, dex volume for ANY protocol
+chainq protocols llama top -c Lending -l 10              # top protocols by TVL, optional category
+chainq protocols llama chains                            # chains ranked by DeFi TVL
+```
+
+Use `llama protocol` when the user asks about a protocol chainq has no dedicated command for — DefiLlama tracks thousands.
+
+## Hyperliquid (public data)
+
+```bash
+chainq protocols hl price BTC ETH            # perps: mark/oracle price, 24h change, volume, OI, funding
+chainq protocols hl markets -l 10 -s oi      # top perp markets; sort: volume | oi | funding | change
+chainq protocols hl funding                  # most extreme funding rates (hourly % and APR)
+chainq protocols hl funding BTC ETH          # funding for specific coins
+chainq protocols hl funding BTC --history -D 30  # historical funding over N days: cumulative, mean, APR, range
+chainq protocols hl positions 0xADDRESS      # perp account value, margin, positions with PnL/liq price
+chainq protocols hl spot price HYPE PURR     # spot pairs: price, 24h change, volume, mcap
+chainq protocols hl spot markets -l 10       # top spot markets by volume
+chainq protocols hl spot balances 0xADDRESS --min-usd 10  # spot token balances with USD values (hide dust)
+chainq protocols hl dexs                     # HIP-3 builder-deployed perp dexs (xyz, flx, vntl...)
+chainq protocols hl markets --dex xyz        # builder dex markets (tokenized stocks, commodities)
+chainq protocols hl price TSLA --dex xyz     # coin names are dex:COIN; bare COIN works with --dex
+chainq protocols hl outcomes [QUERY]         # HIP-4 prediction markets, Yes price = implied probability
+```
+
+## NFTs (OpenSea)
+
+```bash
+chainq nft floor pudgypenguins azuki       # floor price (native + USD), 24h volume, owners
+chainq nft collection pudgypenguins        # full profile: floor, supply, volumes, contract, links
+chainq nft top -s volume -l 10             # top collections; sort: volume | 7d-volume | market-cap | owners
+```
+
+Collections are addressed by OpenSea slug (the last part of an opensea.io/collection/... URL). `floor` and `collection` need no API key for well-known collections; `nft top` and long-tail slugs require one (`chainq config set opensea-api-key <key>`).
+
+## Lighter (public data, perps)
+
+```bash
+chainq protocols lighter markets -l 10 -s oi   # perp markets: last price, 24h change, volume, OI, funding
+chainq protocols lighter price BTC ETH
+chainq protocols lighter funding               # hourly funding + APR
+chainq protocols lighter positions 0xADDRESS   # account value, collateral, open positions
+```
+
+Funding is shown as hourly rate and annualized APR; negative funding means shorts pay longs.
+
+## Recipes
+
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
+- "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
+- "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
+- "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.
+- "Best stable swap rate / stable yields on Curve vs elsewhere" — compare `curve pools -c <coin>` APYs with `aave`/`morpho` supply APYs.
+- Anything chainq lacks a command for — `chainq rpc <method> [params...]` (EVM or Solana methods).
