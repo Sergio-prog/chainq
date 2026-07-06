@@ -112,6 +112,17 @@ chainq protocols uniswap stats                           # protocol TVL + 24h/7d
 
 `pool` (singular) reads factory/pool/StateView contracts directly — authoritative prices and reserves (v4 reports price + in-range liquidity, no reserves; its biggest pools use native 'eth', not weth). `pools` (plural) uses DexScreener for discovery/ranking (symbols resolve through the built-in token registry; prefer addresses for long-tail tokens). Thin low-liquidity tiers can show stale prices — compare across tiers/versions.
 
+## Curve
+
+```bash
+chainq protocols curve pools -n ethereum -l 10           # top pools by TVL: coins, 24h volume, base + CRV APY
+chainq protocols curve pools -c usdc -s volume           # filter by coin/name; sort: tvl | volume | apy
+chainq protocols curve pools -n arbitrum --min-tvl 1e6   # 13 chains: ethereum, arbitrum, base, optimism, ...
+chainq protocols curve stats                             # protocol TVL, 24h volume/fees, crvUSD TVL, CRV price
+```
+
+`apy_base_pct` is the swap-fee APY; `apy_crv_min/max_pct` is the CRV gauge emission range (max = fully boosted). Pool data from Curve's official API.
+
 ## Aerodrome (Base DEX)
 
 ```bash
@@ -194,4 +205,5 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 - "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
 - "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.
+- "Best stable swap rate / stable yields on Curve vs elsewhere" — compare `curve pools -c <coin>` APYs with `aave`/`morpho` supply APYs.
 - Anything chainq lacks a command for — `chainq rpc <method> [params...]` (EVM or Solana methods).

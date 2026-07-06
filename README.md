@@ -111,7 +111,7 @@ chainq protocols aave markets -c usdc -n base     # one asset across markets
 chainq protocols aave markets -s borrow-apy       # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
-Uniswap and Pendle:
+Uniswap, Curve, and Pendle:
 
 ```bash
 chainq protocols uniswap pool weth usdc           # onchain pool state: v2+v3+v4, price + reserves per fee tier
@@ -119,6 +119,8 @@ chainq protocols uniswap pool eth usdc -V v4      # native-currency v4 pools; -V
 chainq protocols uniswap pool 0xPoolAddress       # one pool by address, v2/v3 auto-detected
 chainq protocols uniswap pools "weth usdc"        # pool discovery: price, 24h volume, liquidity, v2/v3/v4
 chainq protocols uniswap stats                    # protocol TVL + volumes
+chainq protocols curve pools -c usdc -s volume    # Curve pools: TVL, 24h volume, base + CRV APY
+chainq protocols curve stats                      # Curve TVL, volume, fees, crvUSD, CRV price
 chainq protocols pendle markets -s implied-apy    # yield markets: implied APY, LP APY, expiry
 ```
 
