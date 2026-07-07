@@ -139,6 +139,7 @@ const runTerminal = async (body: HTMLElement) => {
 
 const installs = [
   { key: "curl", cmd: "curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh" },
+  { key: "windows", cmd: 'powershell -c "irm https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.ps1 | iex"' },
   { key: "brew", cmd: "brew install sergio-prog/tap/chainq" },
   { key: "uv", cmd: "uv tool install chainq" },
   { key: "pipx", cmd: "pipx install chainq" },
