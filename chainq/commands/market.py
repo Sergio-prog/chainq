@@ -4,7 +4,7 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_pct, fmt_usd, humanize_usd
+from chainq.fmt import fmt_pct, fmt_usd, humanize_num, humanize_usd
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, uniswap
@@ -268,8 +268,8 @@ def asset(
         f"  mcap {humanize_usd(data['market_cap_usd'] or 0)}"
         + (f", fdv {humanize_usd(data['fdv_usd'])}" if data["fdv_usd"] else "")
         + f", 24h vol {humanize_usd(data['volume_24h_usd'] or 0)}",
-        f"  supply {humanize_usd(data['circulating_supply'] or 0).removeprefix('$')} circulating"
-        + (f" / {humanize_usd(data['max_supply']).removeprefix('$')} max" if data["max_supply"] else ""),
+        f"  supply {humanize_num(data['circulating_supply'] or 0)} circulating"
+        + (f" / {humanize_num(data['max_supply'])} max" if data["max_supply"] else ""),
     ]
     if ath:
         lines.append(f"  ath {fmt_usd(ath)} ({fmt_pct(data['ath_change_pct'])} from ath, {str(data['ath_date'])[:10]})")

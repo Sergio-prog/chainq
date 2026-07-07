@@ -1,4 +1,20 @@
+import os
+import sys
 from decimal import Decimal
+
+BOLD = "1"
+GREEN = "32"
+RED = "31"
+
+
+def color_enabled() -> bool:
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
+
+
+def paint(text: str, code: str) -> str:
+    if not color_enabled():
+        return text
+    return f"\033[{code}m{text}\033[0m"
 
 
 def fmt_amount(value: object) -> str:
@@ -17,25 +33,37 @@ def fmt_usd(value: object) -> str:
     d = Decimal(str(value))
     sign = "-" if d < 0 else ""
     d = abs(d)
-    if d >= 1:
-        return f"{sign}${d:,.2f}"
-    return f"{sign}${fmt_amount(d)}"
+    text = f"{sign}${d:,.2f}" if d >= 1 else f"{sign}${fmt_amount(d)}"
+    return paint(text, BOLD)
 
 
-def humanize_usd(value: object) -> str:
+def humanize_num(value: object) -> str:
     n = float(value)
     sign = "-" if n < 0 else ""
     n = abs(n)
     for suffix, div in (("T", 1e12), ("B", 1e9), ("M", 1e6), ("K", 1e3)):
         if n >= div:
-            return f"{sign}${n / div:,.2f}{suffix}"
-    return f"{sign}${n:,.2f}"
+            return f"{sign}{n / div:,.2f}{suffix}"
+    return f"{sign}{n:,.2f}"
+
+
+def humanize_usd(value: object) -> str:
+    n = humanize_num(value)
+    text = f"-${n[1:]}" if n.startswith("-") else f"${n}"
+    return paint(text, BOLD)
 
 
 def fmt_pct(value: float | None, signed: bool = True) -> str:
     if value is None:
         return "n/a"
-    return f"{value:+.2f}%" if signed else f"{value:.2f}%"
+    if not signed:
+        return f"{value:.2f}%"
+    text = f"{value:+.2f}%"
+    if value > 0:
+        return paint(text, GREEN)
+    if value < 0:
+        return paint(text, RED)
+    return text
 
 
 def fmt_gwei(wei: int | None) -> str:
