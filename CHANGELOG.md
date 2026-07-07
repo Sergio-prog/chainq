@@ -2,6 +2,21 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.14.0
+
+### Features
+- add windows install tab and social meta tags to site
+- windows powershell installer and hardened install.sh
+- colorize prices, mcap, and 24h change in tty output
+
+### Documentation
+- add implementation plans for six roadmap features
+- slim roadmap to status and next, drop changelog duplication
+- regenerate changelog for v0.13.1
+
+### Refactoring
+- move coingecko and uniswap static data to dedicated modules
+
 ## v0.13.1
 
 ### Features
