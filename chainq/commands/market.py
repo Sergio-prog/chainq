@@ -8,8 +8,9 @@ from chainq.fmt import fmt_pct, fmt_usd, humanize_usd
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, uniswap
+from chainq.providers.uniswap_data import CHAIN_SLUGS
 
-SLUG_TO_NETWORK = {slug: key for key, slug in uniswap.CHAIN_SLUGS.items()}
+SLUG_TO_NETWORK = {slug: key for key, slug in CHAIN_SLUGS.items()}
 
 
 def _dexscreener_best_pair(address: str, network_key: str | None) -> dict | None:
@@ -17,7 +18,7 @@ def _dexscreener_best_pair(address: str, network_key: str | None) -> dict | None
         p
         for p in uniswap.token_pairs(address)
         if ((p.get("baseToken") or {}).get("address") or "").lower() == address.lower()
-        and (network_key is None or p.get("chainId") == uniswap.CHAIN_SLUGS.get(network_key))
+        and (network_key is None or p.get("chainId") == CHAIN_SLUGS.get(network_key))
     ]
     if not pairs:
         return None

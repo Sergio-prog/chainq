@@ -8,7 +8,7 @@ from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
-from chainq.providers import uniswap
+from chainq.providers import uniswap, uniswap_data
 from chainq.rpc import (
     connect,
     decode_address,
@@ -56,7 +56,7 @@ def pools(
     if sort not in SORT_KEYS:
         raise ChainqError(f"unknown sort '{sort}' (use: {', '.join(SORT_KEYS)})")
     net = resolve_network(network)
-    chain_slug = uniswap.CHAIN_SLUGS.get(net.key)
+    chain_slug = uniswap_data.CHAIN_SLUGS.get(net.key)
     if chain_slug is None:
         raise ChainqError(f"no DexScreener mapping for {net.name}")
     parts = query.replace("/", " ").split()
@@ -157,12 +157,12 @@ def _onchain_rows(client, net, version: str, token_a: str, token_b: str, fees: l
     calls: list[tuple[str, bytes]] = []
     if version in ("v2", "all") and supported["v2"]:
         discovery.append(("v2", None))
-        calls.append((uniswap.V2_FACTORIES[net.key], encode_call(uniswap.V2_FACTORY_ABI, "getPair", [erc_a, erc_b])))
+        calls.append((uniswap_data.V2_FACTORIES[net.key], encode_call(uniswap_data.V2_FACTORY_ABI, "getPair", [erc_a, erc_b])))
     if version in ("v3", "all") and supported["v3"]:
         for tier in fees:
             discovery.append(("v3", tier))
             calls.append(
-                (uniswap.V3_FACTORIES[net.key], encode_call(uniswap.V3_FACTORY_ABI, "getPool", [erc_a, erc_b, tier]))
+                (uniswap_data.V3_FACTORIES[net.key], encode_call(uniswap_data.V3_FACTORY_ABI, "getPool", [erc_a, erc_b, tier]))
             )
     found = []
     if calls:
@@ -183,22 +183,22 @@ def _onchain_rows(client, net, version: str, token_a: str, token_b: str, fees: l
     for ver, tier, pool_address in found:
         if ver == "v2":
             state_plan.append(("v2", tier, pool_address, 1))
-            state_calls.append((pool_address, encode_call(uniswap.V2_PAIR_ABI, "getReserves")))
+            state_calls.append((pool_address, encode_call(uniswap_data.V2_PAIR_ABI, "getReserves")))
         else:
             state_plan.append(("v3", tier, pool_address, 3))
-            state_calls.append((pool_address, encode_call(uniswap.V3_POOL_ABI, "slot0")))
+            state_calls.append((pool_address, encode_call(uniswap_data.V3_POOL_ABI, "slot0")))
             state_calls.append((token0, encode_erc20("balanceOf", [pool_address])))
             state_calls.append((token1, encode_erc20("balanceOf", [pool_address])))
     if use_v4:
-        state_view = uniswap.V4_STATE_VIEWS[net.key]
+        state_view = uniswap_data.V4_STATE_VIEWS[net.key]
         for tier in fees:
-            tick_spacing = uniswap.V4_FEE_TICK_SPACING.get(tier)
+            tick_spacing = uniswap_data.V4_FEE_TICK_SPACING.get(tier)
             if tick_spacing is None:
                 continue
             pool_id = _v4_pool_id(currency0, currency1, tier, tick_spacing)
             state_plan.append(("v4", tier, f"0x{pool_id.hex().removeprefix('0x')}", 2))
-            state_calls.append((state_view, encode_call(uniswap.V4_STATE_VIEW_ABI, "getSlot0", [pool_id])))
-            state_calls.append((state_view, encode_call(uniswap.V4_STATE_VIEW_ABI, "getLiquidity", [pool_id])))
+            state_calls.append((state_view, encode_call(uniswap_data.V4_STATE_VIEW_ABI, "getSlot0", [pool_id])))
+            state_calls.append((state_view, encode_call(uniswap_data.V4_STATE_VIEW_ABI, "getLiquidity", [pool_id])))
     results = multicall(client, state_calls)
     rows = []
     cursor = 0
@@ -274,11 +274,11 @@ def _pool_by_address(client, net, address: str, memo: dict) -> list[dict]:
     slot0, fee_raw, reserves, token0_raw, token1_raw = multicall(
         client,
         [
-            (checksummed, encode_call(uniswap.V3_POOL_ABI, "slot0")),
-            (checksummed, encode_call(uniswap.V3_POOL_ABI, "fee")),
-            (checksummed, encode_call(uniswap.V2_PAIR_ABI, "getReserves")),
-            (checksummed, encode_call(uniswap.V2_PAIR_ABI, "token0")),
-            (checksummed, encode_call(uniswap.V2_PAIR_ABI, "token1")),
+            (checksummed, encode_call(uniswap_data.V3_POOL_ABI, "slot0")),
+            (checksummed, encode_call(uniswap_data.V3_POOL_ABI, "fee")),
+            (checksummed, encode_call(uniswap_data.V2_PAIR_ABI, "getReserves")),
+            (checksummed, encode_call(uniswap_data.V2_PAIR_ABI, "token0")),
+            (checksummed, encode_call(uniswap_data.V2_PAIR_ABI, "token1")),
         ],
     )
     if token0_raw is None or token1_raw is None or (slot0 is None and reserves is None):
@@ -362,16 +362,16 @@ def pool(
         )
         return
     supported = {
-        "v2": net.key in uniswap.V2_FACTORIES,
-        "v3": net.key in uniswap.V3_FACTORIES,
-        "v4": net.key in uniswap.V4_STATE_VIEWS,
+        "v2": net.key in uniswap_data.V2_FACTORIES,
+        "v3": net.key in uniswap_data.V3_FACTORIES,
+        "v4": net.key in uniswap_data.V4_STATE_VIEWS,
     }
     if version != "all" and not supported[version]:
         raise ChainqError(f"no known Uniswap {version} deployment on {net.name}")
     if not any(supported.values()):
         raise ChainqError(f"no known Uniswap deployment on {net.name}")
     client = connect(net)
-    fees = [fee] if fee else list(uniswap.V3_FEE_TIERS)
+    fees = [fee] if fee else list(uniswap_data.V3_FEE_TIERS)
     rows = _onchain_rows(client, net, version, token_a, token_b, fees, supported)
     if not rows:
         raise ChainqError(f"no Uniswap pool for {token_a}/{token_b} on {net.name} (version: {version})")

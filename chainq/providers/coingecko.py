@@ -3,68 +3,9 @@ import httpx
 from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
+from chainq.providers.coingecko_data import CONTRACT_LOOKUP_ORDER, PLATFORM_IDS, SYMBOL_TO_ID
 
 BASE_URL = "https://api.coingecko.com/api/v3"
-
-SYMBOL_TO_ID = {
-    "btc": "bitcoin",
-    "eth": "ethereum",
-    "sol": "solana",
-    "usdt": "tether",
-    "usdc": "usd-coin",
-    "bnb": "binancecoin",
-    "xrp": "ripple",
-    "ada": "cardano",
-    "doge": "dogecoin",
-    "avax": "avalanche-2",
-    "dot": "polkadot",
-    "link": "chainlink",
-    "pol": "polygon-ecosystem-token",
-    "matic": "polygon-ecosystem-token",
-    "arb": "arbitrum",
-    "op": "optimism",
-    "uni": "uniswap",
-    "aave": "aave",
-    "ldo": "lido-dao",
-    "mkr": "maker",
-    "sky": "sky",
-    "ena": "ethena",
-    "usde": "ethena-usde",
-    "hype": "hyperliquid",
-    "sui": "sui",
-    "apt": "aptos",
-    "ton": "the-open-network",
-    "trx": "tron",
-    "ltc": "litecoin",
-    "near": "near",
-    "atom": "cosmos",
-    "fil": "filecoin",
-    "inj": "injective",
-    "tia": "celestia",
-    "sei": "sei-network",
-    "pepe": "pepe",
-    "shib": "shiba-inu",
-    "wbtc": "wrapped-bitcoin",
-    "weth": "weth",
-    "steth": "staked-ether",
-    "dai": "dai",
-    "crv": "curve-dao-token",
-    "gho": "gho",
-    "xdai": "xdai",
-    "cbbtc": "coinbase-wrapped-btc",
-    "wbnb": "wbnb",
-    "btcb": "binance-bitcoin",
-    "wavax": "wrapped-avax",
-    "wxdai": "wrapped-xdai",
-    "wpol": "polygon-ecosystem-token",
-    "jup": "jupiter-exchange-solana",
-    "wif": "dogwifcoin",
-    "bonk": "bonk",
-    "wsol": "wrapped-solana",
-    "msol": "msol",
-    "jitosol": "jito-staked-sol",
-    "crvusd": "crvusd",
-}
 
 
 def _get(path: str, params: dict | None = None, ttl: float = 30, none_on_404: bool = False) -> dict | list | None:
@@ -88,38 +29,6 @@ def _get(path: str, params: dict | None = None, ttl: float = 30, none_on_404: bo
     result = resp.json()
     cache.put(key, result, ttl)
     return result
-
-
-PLATFORM_IDS = {
-    "ethereum": "ethereum",
-    "arbitrum": "arbitrum-one",
-    "base": "base",
-    "optimism": "optimistic-ethereum",
-    "polygon": "polygon-pos",
-    "bsc": "binance-smart-chain",
-    "avalanche": "avalanche",
-    "gnosis": "xdai",
-    "unichain": "unichain",
-    "linea": "linea",
-    "scroll": "scroll",
-    "zksync": "zksync",
-    "mantle": "mantle",
-    "blast": "blast",
-    "sonic": "sonic",
-    "berachain": "berachain",
-    "worldchain": "world-chain",
-    "ink": "ink",
-    "soneium": "soneium",
-    "celo": "celo",
-    "sei": "sei-v2",
-    "hyperevm": "hyperevm",
-    "monad": "monad",
-    "plasma": "plasma",
-    "katana": "katana",
-    "solana": "solana",
-}
-
-CONTRACT_LOOKUP_ORDER = ("ethereum", "base", "arbitrum", "bsc", "polygon", "optimism", "avalanche", "hyperevm")
 
 
 def is_address(query: str) -> bool:
