@@ -40,10 +40,16 @@ Plus `-v` for provenance (RPC endpoint used, data source, explorer links). Error
 
 ## Install
 
-One-liner:
+One-liner (macOS / Linux):
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh
+```
+
+Windows:
+
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.ps1 | iex"
 ```
 
 Homebrew:
@@ -66,7 +72,7 @@ git clone https://github.com/Sergio-prog/chainq && cd chainq
 uv tool install .
 ```
 
-Requires Python 3.12+ (the install script bootstraps uv, which handles that for you). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
+The install scripts bootstrap uv if it's missing (whether or not Python is already installed — uv provisions Python 3.12+ as needed). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
 
 ## Commands
 
