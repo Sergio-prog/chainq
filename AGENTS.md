@@ -24,8 +24,9 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 - `chainq/providers/*` are HTTP clients (CoinGecko, Hyperliquid, Aave GraphQL) using `chainq/cache.py` (TTL 30–300s, `~/.cache/chainq/`).
 - `chainq/networks.py` and `chainq/tokens.py` are curated registries (checksummed addresses — tests enforce; SPL mints live in `SOLANA_TOKENS`); `chainq/rpc.py` wraps web3 with RPC fallback and Multicall3 batching (prefer `multicall`/`sweep_balances` over per-token calls); `chainq/solana.py` is the Solana JSON-RPC client (base58, balances, token accounts); `chainq/output.py` owns all formatting.
 - `chainq/update.py` — self-update + once-daily version reminder (disable via `CHAINQ_NO_UPDATE_CHECK`).
+- don't forget that there is landing site in ./site.
 
-## Important files
+## Important things
 
 - `ROADMAP.md` — vision, shipped versions, what to build next.
 - `skills/chainq/SKILL.md` — the agent skill, primary distribution channel; update on any command change.
