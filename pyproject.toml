@@ -30,6 +30,7 @@ dev = [
 ]
 
 [project.urls]
+Homepage = "https://chainq.serhiifotex.dev/"
 Repository = "https://github.com/Sergio-prog/chainq"
 Issues = "https://github.com/Sergio-prog/chainq/issues"
 Roadmap = "https://github.com/Sergio-prog/chainq/blob/main/ROADMAP.md"

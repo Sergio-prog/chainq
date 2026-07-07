@@ -2,6 +2,8 @@
 
 **One CLI for the crypto world — built for AI agents, pleasant for humans.**
 
+[chainq.serhiifotex.dev](https://chainq.serhiifotex.dev/)
+
 Query asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols (Aave, Uniswap, Curve, Morpho, Pendle...), and Hyperliquid perps from a single tool. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
 
 ```console
