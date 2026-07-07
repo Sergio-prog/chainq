@@ -2,6 +2,16 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.13.1
+
+### Features
+- add one-screen landing page with llms.txt standard
+
+### Documentation
+- add website link to package metadata and README
+- add chain emoji to README title
+- regenerate changelog for v0.13.0
+
 ## v0.13.0
 
 ### Features
