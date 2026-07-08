@@ -2,6 +2,19 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.15.0
+
+### Features
+- add global --version and --no-color flags
+- dim labels and bold values across all command output
+
+### Fixes
+- **site**: absolute og image url and og:url for scrapers
+- **site**: use jpg og image for social card compatibility
+
+### Documentation
+- regenerate changelog for v0.14.0
+
 ## v0.14.0
 
 ### Features
