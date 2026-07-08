@@ -1,6 +1,6 @@
 [project]
 name = "chainq"
-version = "0.15.0"
+version = "0.15.1"
 description = "Agent-friendly CLI for onchain and crypto market data: balances, gas, transactions, raw RPC on EVM + Solana, asset prices, address intelligence, Aave, Uniswap, Curve, Hyperliquid."
 readme = "README.md"
 license = "MIT"
