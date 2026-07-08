@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_amount
+from chainq.fmt import dim, fmt_amount
 
 FORMATS = ("text", "json", "table", "toon")
 
@@ -14,6 +14,15 @@ JsonOpt = Annotated[bool, typer.Option("--json", help="structured JSON output (s
 QuietOpt = Annotated[bool, typer.Option("--quiet", "-q", help="bare primary value only (pipe-friendly)")]
 VerboseOpt = Annotated[bool, typer.Option("--verbose", "-v", help="extra detail (sources, endpoints, raw fields)")]
 FormatOpt = Annotated[str, typer.Option("--format", "-f", help="output format: text | json | table | toon")]
+
+
+def dim_label(line: str) -> str:
+    if line.lstrip().startswith(("{", "[")):
+        return line
+    idx = line.find(": ")
+    if idx <= 0 or "\033" in line[:idx]:
+        return line
+    return dim(line[: idx + 1]) + line[idx + 1 :]
 
 
 def _is_rows(value: object) -> bool:
@@ -149,10 +158,10 @@ class Out:
             print(quiet_value)
             return
         if isinstance(text, str):
-            print(text)
+            print(dim_label(text))
         else:
             for line in text:
-                print(line)
+                print(dim_label(line))
         if self.verbose:
             for line in verbose_lines:
-                print(line)
+                print(dim_label(line))

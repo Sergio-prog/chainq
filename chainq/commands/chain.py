@@ -10,7 +10,7 @@ from web3.types import RPCEndpoint
 
 from chainq import solana
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_amount, fmt_gwei, fmt_usd, short_addr
+from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko
@@ -134,7 +134,7 @@ def balance(
         "value_usd": usd_value,
     }
     label = f"{address} ({short_addr(addr)})" if address != addr else short_addr(addr)
-    text = f"{label} on {net.name}: {fmt_amount(amount)} {symbol}"
+    text = f"{dim(f'{label} on {net.name}:')} {bold(f'{fmt_amount(amount)} {symbol}')}"
     if usd_value is not None:
         text += f" (~{fmt_usd(usd_value)})"
     out.emit(

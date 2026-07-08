@@ -1,6 +1,6 @@
 import sys
 
-from chainq.fmt import fmt_amount, fmt_gwei, fmt_pct, fmt_usd, humanize_num, humanize_usd, short_addr
+from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_pct, fmt_usd, humanize_num, humanize_usd, short_addr
 
 
 def test_fmt_amount():
@@ -51,9 +51,42 @@ def test_colors_on_tty(monkeypatch):
     assert fmt_pct(4.82) == "\033[32m+4.82%\033[0m"
     assert fmt_pct(-2.13) == "\033[31m-2.13%\033[0m"
     assert fmt_pct(0.0) == "+0.00%"
-    assert fmt_pct(4.82, signed=False) == "4.82%"
+    assert fmt_pct(4.82, signed=False) == "\033[1m4.82%\033[0m"
     assert fmt_usd(1955.339) == "\033[1m$1,955.34\033[0m"
     assert humanize_usd(-1_500_000) == "\033[1m-$1.50M\033[0m"
+    assert dim("24h") == "\033[2m24h\033[0m"
+    assert bold("6.669 ETH") == "\033[1m6.669 ETH\033[0m"
+
+
+def test_no_codes_when_piped():
+    assert dim("24h") == "24h"
+    assert bold("x") == "x"
+
+
+def test_disable_colors_flag(monkeypatch):
+    import chainq.fmt as fmt
+
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setattr(fmt, "_color_off", False)
+    assert fmt.color_enabled()
+    fmt.disable_colors()
+    assert not fmt.color_enabled()
+    assert fmt_usd(1955.339) == "$1,955.34"
+    monkeypatch.setattr(fmt, "_color_off", False)
+
+
+def test_dim_label(monkeypatch):
+    from chainq.output import dim_label
+
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    assert dim_label("Base gas: 0.006 gwei") == "\033[2mBase gas:\033[0m 0.006 gwei"
+    assert dim_label("  ethereum: 5.66 ETH") == "\033[2m  ethereum:\033[0m 5.66 ETH"
+    assert dim_label('{"network": "base"}') == '{"network": "base"}'
+    assert dim_label("\033[2mETH:\033[0m $1,776") == "\033[2mETH:\033[0m $1,776"
+    assert dim_label("Base gas: \033[1m0.006 gwei\033[0m") == "\033[2mBase gas:\033[0m \033[1m0.006 gwei\033[0m"
+    assert dim_label("no colon here") == "no colon here"
 
 
 def test_no_color_env_wins(monkeypatch):

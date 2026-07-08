@@ -3,18 +3,34 @@ import sys
 from decimal import Decimal
 
 BOLD = "1"
+DIM = "2"
 GREEN = "32"
 RED = "31"
 
+_color_off = False
+
+
+def disable_colors() -> None:
+    global _color_off
+    _color_off = True
+
 
 def color_enabled() -> bool:
-    return sys.stdout.isatty() and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
+    return not _color_off and sys.stdout.isatty() and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
 
 
 def paint(text: str, code: str) -> str:
     if not color_enabled():
         return text
     return f"\033[{code}m{text}\033[0m"
+
+
+def bold(text: str) -> str:
+    return paint(text, BOLD)
+
+
+def dim(text: str) -> str:
+    return paint(text, DIM)
 
 
 def fmt_amount(value: object) -> str:
@@ -57,7 +73,7 @@ def fmt_pct(value: float | None, signed: bool = True) -> str:
     if value is None:
         return "n/a"
     if not signed:
-        return f"{value:.2f}%"
+        return paint(f"{value:.2f}%", BOLD)
     text = f"{value:+.2f}%"
     if value > 0:
         return paint(text, GREEN)
@@ -69,7 +85,7 @@ def fmt_pct(value: float | None, signed: bool = True) -> str:
 def fmt_gwei(wei: int | None) -> str:
     if wei is None:
         return "n/a"
-    return f"{fmt_amount(Decimal(wei) / Decimal(10**9))} gwei"
+    return paint(f"{fmt_amount(Decimal(wei) / Decimal(10**9))} gwei", BOLD)
 
 
 def short_addr(address: str) -> str:

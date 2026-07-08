@@ -4,7 +4,7 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_pct, fmt_usd, humanize_num, humanize_usd
+from chainq.fmt import dim, fmt_pct, fmt_usd, humanize_num, humanize_usd
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, uniswap
@@ -91,9 +91,9 @@ def _price_at(out: Out, assets: list[str], network_key: str | None, at: str):
             "source": "coingecko",
         }
         data.append(row)
-        line = f"{coin_id} on {iso}: {fmt_usd(price_usd)}"
+        line = f"{dim(f'{coin_id} on {iso}:')} {fmt_usd(price_usd)}"
         if row["market_cap_usd"]:
-            line += f"  mcap {humanize_usd(row['market_cap_usd'])}"
+            line += f"  {dim('mcap')} {humanize_usd(row['market_cap_usd'])}"
         lines.append(line)
         quiet_values.append(str(price_usd))
     out.emit(data if len(data) > 1 else data[0], lines, quiet_value="\n".join(quiet_values))
@@ -135,10 +135,10 @@ def price(
     for query, coin_id, fallback in entries:
         if fallback is not None:
             data.append(fallback)
-            line = f"{fallback['symbol'].upper()} ({fallback['name']}): {fmt_usd(fallback['price_usd'] or 0)}  " \
-                f"24h {fmt_pct(fallback['change_24h_pct'])}"
+            line = f"{dim(f'{fallback["symbol"].upper()} ({fallback["name"]}):')} " \
+                f"{fmt_usd(fallback['price_usd'] or 0)}  {dim('24h')} {fmt_pct(fallback['change_24h_pct'])}"
             if fallback.get("market_cap_usd"):
-                line += f"  mcap {humanize_usd(fallback['market_cap_usd'])}"
+                line += f"  {dim('mcap')} {humanize_usd(fallback['market_cap_usd'])}"
             lines.append(line + f"  [dexscreener/{fallback['chain']}]")
             quiet_values.append(str(fallback["price_usd"]))
             verbose_lines.append(f"{fallback['symbol'].upper()}: contract {query}, best pair by liquidity [dexscreener]")
@@ -162,9 +162,10 @@ def price(
                 "source": "coingecko",
             }
         )
-        line = f"{m['symbol'].upper()} ({m['name']}): {fmt_usd(m['current_price'])}  24h {fmt_pct(change_24h)}"
+        label = dim(f"{m['symbol'].upper()} ({m['name']}):")
+        line = f"{label} {fmt_usd(m['current_price'])}  {dim('24h')} {fmt_pct(change_24h)}"
         if m.get("market_cap"):
-            line += f"  mcap {humanize_usd(m['market_cap'])}"
+            line += f"  {dim('mcap')} {humanize_usd(m['market_cap'])}"
         lines.append(line)
         quiet_values.append(str(m["current_price"]))
         verbose_lines.append(
@@ -210,10 +211,10 @@ def trending(
             }
         )
     lines = [
-        f"{i}. {r['symbol'].upper()} ({r['name']}): "
+        dim(f"{i}. {r['symbol'].upper()} ({r['name']}):") + " "
         + (fmt_usd(r["price_usd"]) if r["price_usd"] is not None else "n/a")
-        + f"  24h {fmt_pct(r['change_24h_pct'])}"
-        + (f"  mcap {humanize_usd(r['market_cap_usd'])}" if r["market_cap_usd"] else "")
+        + f"  {dim('24h')} {fmt_pct(r['change_24h_pct'])}"
+        + (f"  {dim('mcap')} {humanize_usd(r['market_cap_usd'])}" if r["market_cap_usd"] else "")
         for i, r in enumerate(rows, start=1)
     ]
     out.emit(rows, lines, quiet_value="\n".join(r["id"] for r in rows))
@@ -262,17 +263,19 @@ def asset(
         "source": "coingecko",
     }
     lines = [
-        f"{c['name']} ({c['symbol'].upper()}) — rank #{data['market_cap_rank']}",
-        f"  price {fmt_usd(price_usd)}  24h {fmt_pct(data['change_24h_pct'])}  "
-        f"7d {fmt_pct(data['change_7d_pct'])}  30d {fmt_pct(data['change_30d_pct'])}",
-        f"  mcap {humanize_usd(data['market_cap_usd'] or 0)}"
-        + (f", fdv {humanize_usd(data['fdv_usd'])}" if data["fdv_usd"] else "")
-        + f", 24h vol {humanize_usd(data['volume_24h_usd'] or 0)}",
-        f"  supply {humanize_num(data['circulating_supply'] or 0)} circulating"
+        f"{c['name']} ({c['symbol'].upper()}) {dim(f'— rank #{data["market_cap_rank"]}')}",
+        f"  {dim('price')} {fmt_usd(price_usd)}  {dim('24h')} {fmt_pct(data['change_24h_pct'])}  "
+        f"{dim('7d')} {fmt_pct(data['change_7d_pct'])}  {dim('30d')} {fmt_pct(data['change_30d_pct'])}",
+        f"  {dim('mcap')} {humanize_usd(data['market_cap_usd'] or 0)}"
+        + (f", {dim('fdv')} {humanize_usd(data['fdv_usd'])}" if data["fdv_usd"] else "")
+        + f", {dim('24h vol')} {humanize_usd(data['volume_24h_usd'] or 0)}",
+        f"  {dim('supply')} {humanize_num(data['circulating_supply'] or 0)} circulating"
         + (f" / {humanize_num(data['max_supply'])} max" if data["max_supply"] else ""),
     ]
     if ath:
-        lines.append(f"  ath {fmt_usd(ath)} ({fmt_pct(data['ath_change_pct'])} from ath, {str(data['ath_date'])[:10]})")
+        lines.append(
+            f"  {dim('ath')} {fmt_usd(ath)} ({fmt_pct(data['ath_change_pct'])} from ath, {str(data['ath_date'])[:10]})"
+        )
     out.emit(
         data,
         lines,
