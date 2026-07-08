@@ -2,6 +2,14 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.15.1
+
+### Fixes
+- route hl funding, morpho and pendle percentages through fmt_pct
+
+### Documentation
+- regenerate changelog for v0.15.0
+
 ## v0.15.0
 
 ### Features
