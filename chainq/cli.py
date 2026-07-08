@@ -1,10 +1,11 @@
 import json
 import sys
+from typing import Annotated
 
 import httpx
 import typer
 
-from chainq import __version__, update
+from chainq import __version__, fmt, update
 from chainq.commands import address, chain, config, market, nft, portfolio, protocols, stables
 from chainq.errors import ChainqError
 
@@ -15,6 +16,25 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Agent-friendly CLI for onchain and crypto market data. Every command supports --json, -q, -v.",
 )
+
+
+def _print_version(value: bool):
+    if value:
+        print(__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Annotated[
+        bool, typer.Option("--version", help="print version and exit", callback=_print_version, is_eager=True)
+    ] = False,
+    no_color: Annotated[
+        bool, typer.Option("--no-color", help="disable colors in text output (NO_COLOR env works too)")
+    ] = False,
+):
+    if no_color:
+        fmt.disable_colors()
 
 app.command()(chain.networks)
 app.command()(chain.balance)

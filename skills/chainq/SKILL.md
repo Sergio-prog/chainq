@@ -9,7 +9,7 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 
 ## Output rules
 
-- Default output is one human-readable line per result — safe to show the user as-is.
+- Default output is one human-readable line per result — safe to show the user as-is. ANSI colors appear only in interactive terminals; your piped/captured output is always plain text (`--no-color` and `NO_COLOR` also force it off).
 - Add `--json` to any command for structured output you need to parse or compute over.
 - Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
 - `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.

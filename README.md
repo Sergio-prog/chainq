@@ -38,6 +38,8 @@ Agents are terrible at juggling five different APIs, auth schemes, and SDKs — 
 
 Plus `-v` for provenance (RPC endpoint used, data source, explorer links). Errors go to stderr with exit code 1. Responses are cached briefly (30–60s) so repeated queries stay fast and under rate limits.
 
+In interactive terminals the text output is colorized — dim labels, bold values, green/red price changes. Piped output stays plain automatically; disable colors explicitly with `chainq --no-color <command>` or the `NO_COLOR` env var. `chainq --version` prints the version.
+
 ## Install
 
 One-liner (macOS / Linux):
