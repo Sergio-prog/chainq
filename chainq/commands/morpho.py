@@ -3,7 +3,7 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
-from chainq.fmt import humanize_usd
+from chainq.fmt import fmt_pct, humanize_usd
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import morpho
@@ -19,7 +19,7 @@ MARKET_SORT = {
 
 
 def _pct(value: float | None) -> str:
-    return f"{value:.2f}%" if value is not None else "n/a"
+    return fmt_pct(value, signed=False)
 
 
 def _market_row(m: dict) -> dict:

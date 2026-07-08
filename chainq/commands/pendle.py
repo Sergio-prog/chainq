@@ -4,7 +4,7 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
-from chainq.fmt import humanize_usd
+from chainq.fmt import fmt_pct, humanize_usd
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import pendle
@@ -41,8 +41,8 @@ def _market_row(market: dict) -> dict:
 
 
 def _market_line(m: dict) -> str:
-    implied = f"{m['implied_apy_pct']:.2f}%" if m["implied_apy_pct"] is not None else "n/a"
-    lp = f"{m['aggregated_apy_pct']:.2f}%" if m["aggregated_apy_pct"] is not None else "n/a"
+    implied = fmt_pct(m["implied_apy_pct"], signed=False)
+    lp = fmt_pct(m["aggregated_apy_pct"], signed=False)
     return (
         f"{m['name']} (exp {m['expiry']}, {m['days_to_expiry']}d): implied APY {implied}  LP APY {lp}  "
         f"liquidity {humanize_usd(m['liquidity_usd'] or 0)}"

@@ -21,7 +21,7 @@ def _market_line(m: dict) -> str:
     return (
         f"{m['coin']}-PERP: mark {fmt_usd(m['mark_price'])}  24h {fmt_pct(m['change_24h_pct'])}  "
         f"vol {humanize_usd(m['volume_24h_usd'])}  OI {humanize_usd(m['open_interest_usd'])}  "
-        f"funding {m['funding_hourly_pct']:+.4f}%/h ({m['funding_apr_pct']:+.1f}% APR)"
+        f"funding {fmt_pct(m['funding_hourly_pct'], decimals=4)}/h ({fmt_pct(m['funding_apr_pct'], decimals=1)} APR)"
     )
 
 
@@ -114,8 +114,8 @@ def _funding_history(out: Out, coins: list[str], days: int, dex: str):
             }
         )
     lines = [
-        f"{r['coin']}-PERP funding {r['days']}d: cumulative {r['cumulative_pct']:+.4f}%  "
-        f"mean {r['mean_hourly_pct']:+.4f}%/h ({r['annualized_apr_pct']:+.1f}% APR)  "
+        f"{r['coin']}-PERP funding {r['days']}d: cumulative {fmt_pct(r['cumulative_pct'], decimals=4)}  "
+        f"mean {fmt_pct(r['mean_hourly_pct'], decimals=4)}/h ({fmt_pct(r['annualized_apr_pct'], decimals=1)} APR)  "
         f"range [{r['min_hourly_pct']:+.4f}, {r['max_hourly_pct']:+.4f}]%/h  {r['samples']} samples"
         for r in rows
     ]
@@ -152,7 +152,8 @@ def funding(
     else:
         selected = sorted(all_markets, key=lambda m: abs(m["funding_hourly_pct"]), reverse=True)[:limit]
     lines = [
-        f"{m['coin']}-PERP funding: {m['funding_hourly_pct']:+.4f}%/h ({m['funding_apr_pct']:+.1f}% APR)  "
+        f"{m['coin']}-PERP funding: {fmt_pct(m['funding_hourly_pct'], decimals=4)}/h "
+        f"({fmt_pct(m['funding_apr_pct'], decimals=1)} APR)  "
         f"mark {fmt_usd(m['mark_price'])}  OI {humanize_usd(m['open_interest_usd'])}"
         for m in selected
     ]
@@ -205,7 +206,7 @@ def positions(
         )
         lines.append(
             f"  {p.get('coin')}: {side} {fmt_amount(abs(size))} @ {fmt_usd(entry) if entry else 'n/a'}, "
-            f"value {fmt_usd(float(p.get('positionValue') or 0))}, uPnL {fmt_usd(pnl)} ({roe:+.1f}%), "
+            f"value {fmt_usd(float(p.get('positionValue') or 0))}, uPnL {fmt_usd(pnl)} ({fmt_pct(roe, decimals=1)}), "
             f"{leverage}x, liq {fmt_usd(liq) if liq else 'n/a'}"
         )
     if not positions_data:

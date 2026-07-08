@@ -69,12 +69,12 @@ def humanize_usd(value: object) -> str:
     return paint(text, BOLD)
 
 
-def fmt_pct(value: float | None, signed: bool = True) -> str:
+def fmt_pct(value: float | None, signed: bool = True, decimals: int = 2) -> str:
     if value is None:
         return "n/a"
     if not signed:
-        return paint(f"{value:.2f}%", BOLD)
-    text = f"{value:+.2f}%"
+        return paint(f"{value:.{decimals}f}%", BOLD)
+    text = f"{value:+.{decimals}f}%"
     if value > 0:
         return paint(text, GREEN)
     if value < 0:
