@@ -14,6 +14,7 @@ SMOKE = {
     "coingecko-candles": ["candles", "eth", "--days", "7"],
     "coingecko-history": ["price", "btc", "--at", "2026-03-01"],
     "rpc-gas": ["gas", "-n", "ethereum"],
+    "robinhood-gas": ["gas", "-n", "robinhood"],
     "defillama-stables": ["stables"],
     "defillama-chains": ["protocols", "llama", "chains"],
     "hyperliquid": ["protocols", "hl", "markets"],
