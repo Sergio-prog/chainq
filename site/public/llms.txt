@@ -1,6 +1,6 @@
 # chainq
 
-> Agent-first CLI for onchain and crypto market data. One command queries asset prices (spot, historical, OHLC candles), wallet balances and portfolios on 25 EVM networks + Solana, gas, transactions, raw JSON-RPC, address inspection, lending and yield rates (Aave, Morpho, Pendle, Sky, Ethena, Lido), DEX pools (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps and prediction markets, NFT floors, stablecoin pegs, and DefiLlama TVL. Zero setup, no API keys.
+> Agent-first CLI for onchain and crypto market data. One command queries asset prices (spot, historical, OHLC candles), wallet balances and portfolios on 26 EVM networks + Solana, gas, transactions, raw JSON-RPC, address inspection, lending and yield rates (Aave, Morpho, Pendle, Sky, Ethena, Lido), DEX pools (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps and prediction markets, NFT floors, stablecoin pegs, and DefiLlama TVL. Zero setup, no API keys.
 
 Install: `curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh` (or `brew install sergio-prog/tap/chainq`, `uv tool install chainq`, `pipx install chainq`). Requires Python 3.12+ (the script bootstraps uv).
 

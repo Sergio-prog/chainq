@@ -110,7 +110,7 @@ chainq tx 5Ufd... -n solana                           # Solana signature lookup
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch (getSlot on solana)
 ```
 
-25 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
+26 EVM networks: **ethereum, arbitrum, robinhood, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — plus **solana** — by key, alias (`eth`, `arb`, `rh`, `op`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 
 ### Protocols
 

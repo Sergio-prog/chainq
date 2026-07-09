@@ -49,6 +49,16 @@ NETWORKS: dict[str, Network] = {
             aliases=("arb", "arbitrum-one"),
         ),
         Network(
+            key="robinhood",
+            name="Robinhood Chain",
+            chain_id=4663,
+            native_symbol="ETH",
+            native_coingecko_id="ethereum",
+            rpc_urls=("https://rpc.mainnet.chain.robinhood.com",),
+            explorer="https://robinhoodchain.blockscout.com",
+            aliases=("rh", "robinhood-chain"),
+        ),
+        Network(
             key="base",
             name="Base",
             chain_id=8453,
