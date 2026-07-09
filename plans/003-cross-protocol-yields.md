@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 4b48de2..HEAD -- chainq/commands/ chainq/providers/ skills/chainq/SKILL.md`
+> **Drift check (run first)**: `git diff --stat 7b4fb6f..HEAD -- chainq/commands/ chainq/providers/ skills/chainq/SKILL.md`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -16,9 +16,9 @@
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED (aggregates 6+ live providers; failure isolation and honest APY labeling are the risks)
-- **Depends on**: none
+- **Depends on**: `plans/008-kamino-lending.md`
 - **Category**: direction
-- **Planned at**: commit `4b48de2`, 2026-07-07
+- **Planned at**: commit `7b4fb6f`, 2026-07-10 (refreshed to include Kamino)
 
 ## Why this matters
 
@@ -26,11 +26,12 @@ The single most common agent question class — "where's the best yield for X?" 
 
 ## Current state
 
-All yield sources and their normalized field names (verified at `4b48de2` — re-verify against the files, they are the source of truth):
+All yield sources and their normalized field names (refreshed at `7b4fb6f` — re-verify against the files after Plan 008, they are the source of truth):
 
 | Protocol | Call | APY fields | Where rows are built |
 |----------|------|------------|----------------------|
 | Aave v3 | `providers.aave.markets(chain_id)` | `supply_apy_pct`, `borrow_apy_pct` built in `chainq/commands/aave.py:25-40` (`_row`) | commands layer |
+| Kamino | `providers.kamino.market_configs()` / `.reserve_metrics(market)` | `supply_apy_pct`, `borrow_apy_pct`, `supplied_usd` built by `_reserve_row` in `chainq/commands/kamino.py` after Plan 008 | commands layer |
 | Morpho | `providers.morpho.markets(chain_id)` / `.vaults(chain_id)` | `supply_apy_pct`, `net_supply_apy_pct` (markets), vault `apy`/`netApy` — see `chainq/commands/morpho.py:25-45` | commands layer |
 | Pendle | `providers.pendle.active_markets(chain_id)` | `implied_apy_pct`, `aggregated_apy_pct` built in `chainq/commands/pendle.py:20-40` | commands layer |
 | Sky | `providers.sky.savings()` | `ssr_apy_pct`, `dsr_apy_pct` (provider returns final dict) | provider |
@@ -39,7 +40,7 @@ All yield sources and their normalized field names (verified at `4b48de2` — re
 | Curve | `providers.curve.pools(network_key)` | `apy_base_pct`, `apy_crv_min_pct`/`apy_crv_max_pct` | provider |
 | Aerodrome | `providers.aerodrome.top_pools(...)` | `apy_pct`, `apy_base_pct`, `apy_reward_pct` (see `chainq/commands/aerodrome.py:61-62`) | provider |
 
-Key structural fact: **Aave, Morpho, and Pendle normalize rows in their command files, not their providers.** The row-building helpers (`_row` in aave.py, the market/vault mappers in morpho.py, the market mapper in pendle.py) must be imported and reused by `yields`, NOT reimplemented. If a helper is module-private, importing it from another command module is fine (same package, existing style tolerates it) — do not copy-paste the mapping.
+Key structural fact: **Aave, Kamino, Morpho, and Pendle normalize rows in their command files, not their providers.** The row-building helpers (`_row` in aave.py, `_reserve_row` in kamino.py, the market/vault mappers in morpho.py, and the market mapper in pendle.py) must be imported and reused by `yields`, NOT reimplemented. If a helper is module-private, importing it from another command module is fine (same package, existing style tolerates it) — do not copy-paste the mapping.
 
 - `chainq/commands/portfolio.py` — the exemplar for fanning out across sources with `ThreadPoolExecutor` and tolerating per-source failure (read its network sweep before writing the fan-out).
 - `chainq/commands/ethena.py` — exemplar thin command shape (`Out`, `out.emit(data, lines, quiet_value, verbose_lines)`).
@@ -60,7 +61,7 @@ Key structural fact: **Aave, Morpho, and Pendle normalize rows in their command 
 **In scope**:
 - `chainq/commands/yields.py` (create)
 - `chainq/cli.py` (register top-level: `app.command()(yields.yields)`)
-- Minimal, mechanical exports from `chainq/commands/aave.py` / `morpho.py` / `pendle.py` ONLY if a mapper is unusable as-is (e.g. rename `_row` → `row`); no behavior changes to those commands
+- Minimal, mechanical exports from `chainq/commands/aave.py` / `kamino.py` / `morpho.py` / `pendle.py` ONLY if a mapper is unusable as-is (e.g. rename `_row` → `row`); no behavior changes to those commands
 - `tests/test_yields.py` (create)
 - `skills/chainq/SKILL.md`, `README.md`
 
@@ -93,8 +94,8 @@ The unified row every source maps into:
 
 `yields(asset: str | None = --asset/-a, networks: list[str] | None = -n repeatable, kind: str | None = --type, min_tvl: float = --min-tvl 0, limit: int = -l 15, ...contract flags)`.
 
-- Default networks when none passed: `ethereum` and `base` (keeps default latency sane); `-n all` unsupported in v1.
-- Fan out one task per (protocol, network) pair with `ThreadPoolExecutor` (pattern: portfolio.py). Each task wraps its call in try/except `Exception` and returns `(rows, error_note)`; failures become `-v` verbose lines (`"morpho ethereum: <error>"`), never a command failure. If ALL sources fail, raise `ChainqError`.
+- Default networks when none passed: `ethereum`, `base`, and `solana` (keeps EVM latency sane while including Kamino); `-n all` unsupported in v1. Only schedule providers compatible with each selected network: Kamino for Solana, EVM lending/DEX providers for their supported EVM chains, and chain-independent staking providers once.
+- Fan out one task per compatible (protocol, network) pair with `ThreadPoolExecutor` (pattern: portfolio.py). Each task wraps its call in try/except `Exception` and returns `(rows, error_note)`; failures become `-v` verbose lines (`"morpho ethereum: <error>"`), never a command failure. If ALL sources fail, raise `ChainqError`.
 - Asset filter: case-insensitive match against the row's `symbol` and `market` fields. Sky/Ethena/Lido rows carry fixed symbols (`usds`/`dai`, `usde`, `eth`/`steth`) — map them so `--asset usdc` does NOT return sUSDe, but `--asset usde` and `--asset eth` do the right thing.
 - Sort by `apy_pct` desc, apply `--min-tvl` and `-l`.
 - Text line shape: `4.21%  lending  aave USDC [Core] (ethereum)  tvl $1.2B` — APY first (it's the answer), via `fmt_pct(x, signed=False)` from `chainq/fmt.py`.
@@ -105,12 +106,12 @@ The unified row every source maps into:
 ### Step 3: Live tests
 
 - `uv run chainq yields` → ranked lines from ≥3 distinct protocols, exit 0
-- `uv run chainq yields --asset usdc` → only USDC rows (lending/vault types)
+- `uv run chainq yields --asset usdc` → only USDC rows (lending/vault types), including a Kamino/Solana row
 - `uv run chainq yields --asset eth -n ethereum` → includes Lido staking row and Aave WETH row
 - `uv run chainq yields --type lp` → only Curve/Aerodrome rows
 - `uv run chainq yields --json | python3 -m json.tool` → exit 0
 - `uv run chainq yields --format toon` → toon table renders
-- Cross-check one number manually: `uv run chainq protocols aave markets -c usdc -n ethereum --json` supply APY equals the aave/USDC row in `yields --asset usdc --json` (same run window; small drift from cache TTL is fine, >0.5pp difference is a bug)
+- Cross-check two numbers manually: Aave via `uv run chainq protocols aave markets -c usdc -n ethereum --json` and Kamino via `uv run chainq protocols kamino markets -c usdc --json`; each supply APY must equal its row in `yields --asset usdc --json` from the same run window (small cache-window drift is fine; >0.5pp is a bug).
 
 **Verify**: all commands exit 0; cross-check within tolerance.
 
@@ -134,9 +135,9 @@ The unified row every source maps into:
 ## Done criteria
 
 - [ ] `uv run ruff check .` exits 0; `uv run pytest -q` exits 0 with new tests
-- [ ] `uv run chainq yields --asset usdc` returns rows from ≥2 protocols, ranked by APY, exit 0
+- [ ] `uv run chainq yields --asset usdc` returns rows from ≥3 protocols including Kamino on Solana, ranked by APY, exit 0
 - [ ] One protocol failing (unplug test: set `CHAINQ_HTTP_TIMEOUT=0.001`… if that kills all sources, instead verify via the merge-function unit test) does not fail the command
-- [ ] Aave cross-check within 0.5pp
+- [ ] Aave and Kamino cross-checks are each within 0.5pp
 - [ ] SKILL.md workaround sentences replaced; README example added
 - [ ] `git status` shows only in-scope files modified; `plans/README.md` updated
 
@@ -144,12 +145,12 @@ The unified row every source maps into:
 
 Stop and report back if:
 
-- The row-mapping helpers in aave.py/morpho.py/pendle.py cannot be reused without behavior changes to those commands — report what refactor would be needed instead of doing it.
+- The row-mapping helpers in aave.py/kamino.py/morpho.py/pendle.py cannot be reused without behavior changes to those commands — report what refactor would be needed instead of doing it.
 - Field names in the table above don't match the live code (drift) — reconcile from the code, and if a provider's schema changed upstream (live call returns different keys), report it.
 - Latency with default networks exceeds ~15s consistently — report; don't silently cut sources.
 
 ## Maintenance notes
 
-- Every future protocol integration should add a mapper here — reviewer should ask "does this show up in `yields`?" for any new APY-bearing command.
+- Every future APY-bearing protocol integration should add a mapper here; Kamino is included from the first release because Plan 008 is a hard dependency.
 - The `type` taxonomy is the contract; adding a new type value is a user-visible change (bump minor version per repo rule — version lives only in `pyproject.toml`).
 - Deferred: `-n all` sweep, Aave/Morpho *user position* yields (separate roadmap item "Portfolio depth, part 2"), Hyperliquid funding as pseudo-yield.
