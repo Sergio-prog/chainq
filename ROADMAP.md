@@ -2,11 +2,11 @@
 
 ## Vision
 
-Software for agents, not just people. chainq is one universal CLI where any agent (or human) can query the crypto world: RPC state on popular networks with good predefined endpoints, asset prices and metadata, and aggregated data from major protocols — with zero setup, one-line human output, and `--json` everywhere. Distribution is skill-first: a Claude Code skill instead of an MCP server, because a CLI is self-documenting, composable, costs no context until used, and works in any agent with a shell.
+Software for agents, not just people. chainq is one universal CLI where any agent (or human) can retrieve and transform data from the Web3 world: RPC state on popular networks with good predefined endpoints, asset prices and metadata, aggregated protocol data, and composable EVM primitives — with zero setup, one-line human output, and `--json` everywhere. Distribution is skill-first: a Claude Code skill instead of an MCP server, because a CLI is self-documenting, composable, costs no context until used, and works in any agent with a shell.
 
 ## Status
 
-Per-version history lives in [CHANGELOG.md](CHANGELOG.md). Current surface: 25 EVM networks plus Solana (balances, cross-chain portfolio, tx lookup, gas, raw RPC; ENS/SNS/base58 addresses); CoinGecko market data with historical prices and OHLC candles; `chainq address` intelligence (EOA/contract/program, proxy resolution, token profile); protocols — Aave, Morpho, Uniswap (onchain v2/v3/v4 + indexed), Pendle, Hyperliquid (perps, spot, builder dexs, outcome markets), Lighter, Curve, Lido, Aerodrome, Sky, Ethena, DefiLlama; NFT floors via OpenSea; stablecoins overview. Release channels are live: a tag push publishes to PyPI (trusted publishing, attestations) and bumps the Homebrew tap.
+Per-version history lives in [CHANGELOG.md](CHANGELOG.md). Current surface: 25 EVM networks plus Solana (balances, cross-chain portfolio, tx lookup, gas, raw RPC; ENS/SNS/base58 addresses); CoinGecko market data with historical prices and OHLC candles; `chainq address` intelligence (EOA/contract/program, proxy resolution, token profile); EVM state queries, contract calls, ABI codecs, hashes, bytes, and conversions; protocols — Aave, Morpho, Uniswap (onchain v2/v3/v4 + indexed), Pendle, Hyperliquid (perps, spot, builder dexs, outcome markets), Lighter, Curve, Lido, Aerodrome, Sky, Ethena, DefiLlama; NFT floors via OpenSea; stablecoins overview. Release channels are live: a tag push publishes to PyPI (trusted publishing, attestations) and bumps the Homebrew tap.
 
 ## Next
 

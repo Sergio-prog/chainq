@@ -14,6 +14,20 @@ type Session = { cmd: string; out: string[] }[];
 const sessions: Session[] = [
   [
     {
+      cmd: "chainq evm sig 'transfer(address,uint256)'",
+      out: ["transfer(address,uint256): 0xa9059cbb"],
+    },
+    {
+      cmd: "chainq evm block-number -n base",
+      out: ["Base latest block: 32,884,219"],
+    },
+    {
+      cmd: "chainq evm to-wei 1.5 ether",
+      out: ["1.5 ether: 1500000000000000000"],
+    },
+  ],
+  [
+    {
       cmd: "chainq price eth btc hype",
       out: [
         "ETH (Ethereum): $1,788.78  24h +0.57%  mcap $215.92B",

@@ -4,7 +4,7 @@
 
 [chainq.serhiifotex.dev](https://chainq.serhiifotex.dev/)
 
-Query asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols (Aave, Uniswap, Curve, Morpho, Pendle...), and Hyperliquid perps from a single tool. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
+Query and transform Web3 data from one predictable CLI: asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols, perps, and EVM utilities. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
 
 ```console
 $ chainq price eth btc hype
@@ -109,6 +109,25 @@ chainq tx 0xHASH -n ethereum                          # status, parties, value, 
 chainq tx 5Ufd... -n solana                           # Solana signature lookup
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch (getSlot on solana)
 ```
+
+### EVM queries and utilities
+
+`chainq evm` exposes common EVM primitives for agent workflows. Run `chainq evm --help` for the complete command catalog instead of loading it into agent context up front.
+
+```bash
+chainq evm block-number -n base                       # latest block
+chainq evm find-block 2026-07-01T12:00:00Z            # block closest to a timestamp
+chainq evm code 0xContract -n base                    # contract bytecode
+chainq evm storage 0xContract 0 -n base               # storage word at a slot
+chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256
+chainq evm estimate 0xToken 'transfer(address,uint256)' '["0xTo",1]'
+chainq evm sig 'transfer(address,uint256)'             # 0xa9059cbb
+chainq evm abi-encode 'address,uint256' '["0xTo",1]'
+chainq evm keccak 'hello'                              # Keccak-256 of UTF-8 text
+chainq evm to-wei 1.5 ether                            # 1500000000000000000
+```
+
+Every subcommand supports `--json`, `-q`, `-v`, and `--format`. Existing `chainq balance`, `chainq gas`, `chainq tx`, and `chainq rpc` remain the canonical cross-chain commands.
 
 25 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 

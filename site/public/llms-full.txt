@@ -12,7 +12,7 @@
 
 ## Output rules
 
-- Default output is one human-readable line per result — safe to show the user as-is.
+- Default output is one human-readable line per result — safe to show the user as-is. ANSI colors appear only in interactive terminals; your piped/captured output is always plain text (`--no-color` and `NO_COLOR` also force it off).
 - Add `--json` to any command for structured output you need to parse or compute over.
 - Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
 - `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
@@ -68,6 +68,16 @@ chainq gas -n base                                            # gas price, base 
 chainq tx 0xHASH -n ethereum                                  # status, parties, value, fee, block
 chainq rpc eth_blockNumber -n optimism                        # raw JSON-RPC escape hatch, prints JSON
 chainq rpc eth_getBlockByNumber latest false                  # params: JSON literals parsed, rest strings
+```
+
+### EVM queries and utilities
+
+For EVM workflows, run `chainq evm --help` to discover the full catalog only when needed. It covers block lookup, client and account state, code/storage reads, ABI-less calls and gas estimates, ABI codecs, selectors and hashes, bytes/address formatting, bit operations, integer limits, and unit conversions.
+
+```bash
+chainq evm sig 'transfer(address,uint256)'
+chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256 -n base
+chainq evm abi-decode 'address,uint256' 0x...
 ```
 
 Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value. Registry-token reads are batched via Multicall3, so `portfolio` is one RPC call per network.

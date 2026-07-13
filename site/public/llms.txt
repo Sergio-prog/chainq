@@ -1,10 +1,12 @@
 # chainq
 
-> Agent-first CLI for onchain and crypto market data. One command queries asset prices (spot, historical, OHLC candles), wallet balances and portfolios on 25 EVM networks + Solana, gas, transactions, raw JSON-RPC, address inspection, lending and yield rates (Aave, Morpho, Pendle, Sky, Ethena, Lido), DEX pools (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps and prediction markets, NFT floors, stablecoin pegs, and DefiLlama TVL. Zero setup, no API keys.
+> Agent-first CLI for retrieving and transforming Web3 data. Query prices, wallets, DeFi, perps, NFTs, and raw RPC across 25 EVM networks + Solana; inspect EVM state, call contracts, encode/decode ABI data, hash signatures, and convert values. Zero setup, no API keys.
 
 Install: `curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh` (or `brew install sergio-prog/tap/chainq`, `uv tool install chainq`, `pipx install chainq`). Requires Python 3.12+ (the script bootstraps uv).
 
 Teach an agent to use it: `npx skills add Sergio-prog/chainq` — or agents can self-discover everything via `chainq -h` and `chainq <command> -h`.
+
+EVM queries and utilities: run `chainq evm --help` for the complete self-documenting catalog.
 
 Output contract: every command supports `--json` (structured), `-q` (bare value), `-v` (provenance), and `--format text|json|table|toon` (`toon` is a compact tabular encoding using ~2-3x fewer tokens than JSON). Errors go to stderr with exit code 1; in `--json` mode errors print `{"error": "..."}` to stdout instead.
 

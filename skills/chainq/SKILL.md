@@ -67,6 +67,16 @@ chainq rpc eth_blockNumber -n optimism                        # raw JSON-RPC esc
 chainq rpc eth_getBlockByNumber latest false                  # params: JSON literals parsed, rest strings
 ```
 
+### EVM queries and utilities
+
+For EVM workflows, run `chainq evm --help` to discover the full catalog only when needed. It covers block lookup, client and account state, code/storage reads, ABI-less calls and gas estimates, ABI codecs, selectors and hashes, bytes/address formatting, bit operations, integer limits, and unit conversions.
+
+```bash
+chainq evm sig 'transfer(address,uint256)'
+chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256 -n base
+chainq evm abi-decode 'address,uint256' 0x...
+```
+
 Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value. Registry-token reads are batched via Multicall3, so `portfolio` is one RPC call per network.
 
 ### Solana

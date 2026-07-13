@@ -4,9 +4,10 @@ from typing import Annotated
 
 import httpx
 import typer
+from web3.exceptions import Web3Exception
 
 from chainq import __version__, fmt, update
-from chainq.commands import address, chain, config, market, nft, portfolio, protocols, stables
+from chainq.commands import address, chain, config, evm, market, nft, portfolio, protocols, stables
 from chainq.errors import ChainqError
 
 app = typer.Typer(
@@ -41,6 +42,7 @@ app.command()(chain.balance)
 app.command()(chain.gas)
 app.command()(chain.tx)
 app.command()(chain.rpc)
+app.add_typer(evm.app, name="evm")
 app.command()(address.address)
 app.command()(portfolio.portfolio)
 app.command()(market.price)
@@ -89,3 +91,5 @@ def run():
         _fail(str(exc))
     except httpx.HTTPError as exc:
         _fail(f"http request failed: {exc}")
+    except Web3Exception as exc:
+        _fail(f"rpc request failed: {exc}")
