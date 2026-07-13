@@ -2,6 +2,15 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.16.0
+
+### Features
+- add EVM query and utility commands
+
+### Documentation
+- add Robinhood Kamino and Pump plans
+- regenerate changelog for v0.15.1
+
 ## v0.15.1
 
 ### Fixes
