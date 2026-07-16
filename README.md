@@ -141,6 +141,14 @@ chainq protocols aave markets -c usdc -n base     # one asset across markets
 chainq protocols aave markets -s borrow-apy       # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
+Kamino lending on Solana:
+
+```bash
+chainq protocols kamino markets                   # reserves: supply/borrow APY, supplied USD, utilization
+chainq protocols kamino markets -c usdc           # exact symbol or mint filter across discovered markets
+chainq protocols kamino markets -s supply-apy     # sort: supplied | supply-apy | borrow-apy | utilization
+```
+
 Uniswap, Curve, and Pendle:
 
 ```bash

@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - prices (spot, historical, OHLC candles), wallet balances and portfolios on 25 EVM networks + Solana, gas, transactions, raw RPC, address inspection (EOA/contract/proxy/program), lending and yield rates (Aave, Morpho, Pendle, Sky, Ethena, Lido), DEX pools and stats (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps/funding/prediction markets, NFT floors (OpenSea), stablecoin mcaps and pegs, and DefiLlama TVL/fees for any protocol. Use for any question about crypto prices or history, token/wallet balances, gas costs, a transaction hash, onchain state, what an address is, lending/borrowing rates, vault or staking yields, DEX pools, TVL, funding rates, prediction markets, NFT floors, or stablecoins.
+description: Query live crypto and onchain data via the chainq CLI - prices (spot, historical, OHLC candles), wallet balances and portfolios on 25 EVM networks + Solana, gas, transactions, raw RPC, address inspection (EOA/contract/proxy/program), lending and yield rates (Aave, Morpho, Kamino, Pendle, Sky, Ethena, Lido), DEX pools and stats (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps/funding/prediction markets, NFT floors (OpenSea), stablecoin mcaps and pegs, and DefiLlama TVL/fees for any protocol. Use for any question about crypto prices or history, token/wallet balances, gas costs, a transaction hash, onchain state, what an address is, lending/borrowing rates, vault or staking yields, DEX pools, TVL, funding rates, prediction markets, NFT floors, or stablecoins.
 ---
 
 # chainq
@@ -108,6 +108,18 @@ chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy |
 ```
 
 "Best yield on USDC" type questions: run `protocols aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
+
+## Kamino (Solana lending)
+
+```bash
+chainq protocols kamino markets                   # lending reserves ranked by supplied USD
+chainq protocols kamino markets -c usdc           # exact symbol or mint filter
+chainq protocols kamino markets -s supply-apy     # sort by supply APY
+```
+
+Use `--json` to compare `supply_apy_pct`, `borrow_apy_pct`, `supplied_usd`, `utilization_pct`, and
+`max_ltv_pct`. Market and reserve addresses are included for provenance. This surface covers Kamino lending reserves,
+not wallet positions, liquidity strategies, or vaults.
 
 ## Uniswap
 

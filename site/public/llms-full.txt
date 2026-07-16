@@ -112,6 +112,18 @@ chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy |
 
 "Best yield on USDC" type questions: run `protocols aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
 
+## Kamino (Solana lending)
+
+```bash
+chainq protocols kamino markets                   # lending reserves ranked by supplied USD
+chainq protocols kamino markets -c usdc           # exact symbol or mint filter
+chainq protocols kamino markets -s supply-apy     # sort by supply APY
+```
+
+Use `--json` to compare `supply_apy_pct`, `borrow_apy_pct`, `supplied_usd`, `utilization_pct`, and
+`max_ltv_pct`. Market and reserve addresses are included for provenance. This surface covers Kamino lending reserves,
+not wallet positions, liquidity strategies, or vaults.
+
 ## Uniswap
 
 ```bash

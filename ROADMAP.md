@@ -6,7 +6,7 @@ Software for agents, not just people. chainq is one universal CLI where any agen
 
 ## Status
 
-Per-version history lives in [CHANGELOG.md](CHANGELOG.md). Current surface: 25 EVM networks plus Solana (balances, cross-chain portfolio, tx lookup, gas, raw RPC; ENS/SNS/base58 addresses); CoinGecko market data with historical prices and OHLC candles; `chainq address` intelligence (EOA/contract/program, proxy resolution, token profile); EVM state queries, contract calls, ABI codecs, hashes, bytes, and conversions; protocols — Aave, Morpho, Uniswap (onchain v2/v3/v4 + indexed), Pendle, Hyperliquid (perps, spot, builder dexs, outcome markets), Lighter, Curve, Lido, Aerodrome, Sky, Ethena, DefiLlama; NFT floors via OpenSea; stablecoins overview. Release channels are live: a tag push publishes to PyPI (trusted publishing, attestations) and bumps the Homebrew tap.
+Per-version history lives in [CHANGELOG.md](CHANGELOG.md). Current surface: 25 EVM networks plus Solana (balances, cross-chain portfolio, tx lookup, gas, raw RPC; ENS/SNS/base58 addresses); CoinGecko market data with historical prices and OHLC candles; `chainq address` intelligence (EOA/contract/program, proxy resolution, token profile); EVM state queries, contract calls, ABI codecs, hashes, bytes, and conversions; protocols — Aave, Morpho, Kamino lending markets, Uniswap (onchain v2/v3/v4 + indexed), Pendle, Hyperliquid (perps, spot, builder dexs, outcome markets), Lighter, Curve, Lido, Aerodrome, Sky, Ethena, DefiLlama; NFT floors via OpenSea; stablecoins overview. Release channels are live: a tag push publishes to PyPI (trusted publishing, attestations) and bumps the Homebrew tap.
 
 ## Next
 

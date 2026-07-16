@@ -22,6 +22,7 @@ SMOKE = {
     "lighter": ["protocols", "lighter", "markets"],
     "aave": ["protocols", "aave", "markets"],
     "morpho": ["protocols", "morpho", "vaults"],
+    "kamino": ["protocols", "kamino", "markets", "-l", "3"],
     "pendle": ["protocols", "pendle", "markets"],
     "uniswap": ["protocols", "uniswap", "stats"],
     "sky": ["protocols", "sky", "rate"],
