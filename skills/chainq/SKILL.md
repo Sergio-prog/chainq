@@ -44,7 +44,18 @@ chainq protocols ethena yield              # sUSDe APY (current + 30d/90d avg), 
 chainq protocols lido apr                  # stETH staking APR (7d SMA), TVL, wstETH/stETH rate
 ```
 
-Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 1.0. "Where to park stables" questions: compare `sky rate`, `ethena yield`, and lending APYs from aave/morpho.
+Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 1.0. For "where to park stables" questions, use `yields --asset <symbol>`.
+
+## Yields (cross-protocol)
+
+```bash
+chainq yields                              # ranked opportunities across default networks
+chainq yields --asset usdc                 # compare one asset across protocols and yield types
+chainq yields --asset eth -n ethereum      # Ethereum opportunities, including stETH staking
+chainq yields --type lp --min-tvl 1000000  # LP yields above a TVL floor
+```
+
+The `type` values (`lending`, `vault`, `staking`, `lp`, and `fixed`) are not risk-equivalent or directly comparable. LP yields carry impermanent-loss risk, and fixed yields have an expiry.
 
 Prefer `price` for "how much is X"; use `asset` when the user wants depth (supply, FDV, ATH). If a symbol is ambiguous or unknown, run `search` first and use the returned id.
 
@@ -107,7 +118,7 @@ chainq protocols aave markets -c usdc -n base    # one asset (all markets on the
 chainq protocols aave markets -s supply-apy      # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
-"Best yield on USDC" type questions: run `protocols aave markets -c usdc` on the relevant networks and compare `supply_apy_pct` from `--json`. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
+For "best yield on USDC" questions, run `yields --asset usdc`; use the Aave command when protocol-specific reserve details are needed. Data comes from Aave's official API and covers every market on the chain (e.g. Core, Prime, EtherFi on ethereum).
 
 ## Kamino (Solana lending)
 
