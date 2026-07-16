@@ -4,6 +4,7 @@ from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
 from chainq.providers.coingecko_data import CONTRACT_LOOKUP_ORDER, PLATFORM_IDS, SYMBOL_TO_ID
+from chainq.solana import looks_like_solana
 
 BASE_URL = "https://api.coingecko.com/api/v3"
 
@@ -35,13 +36,18 @@ def is_address(query: str) -> bool:
     return query.startswith("0x") and len(query) == 42
 
 
+def is_solana_mint(query: str) -> bool:
+    return not query.startswith("0x") and looks_like_solana(query)
+
+
 def by_contract(address: str, network_key: str | None = None) -> dict | None:
     keys = (network_key,) if network_key else CONTRACT_LOOKUP_ORDER
     for key in keys:
         platform = PLATFORM_IDS.get(key)
         if platform is None:
             continue
-        result = _get(f"/coins/{platform}/contract/{address.lower()}", ttl=300, none_on_404=True)
+        contract_address = address if platform == "solana" else address.lower()
+        result = _get(f"/coins/{platform}/contract/{contract_address}", ttl=300, none_on_404=True)
         if result is not None:
             return result
     return None

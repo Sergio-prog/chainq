@@ -21,6 +21,7 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 ```bash
 chainq price eth btc hype          # spot price, 24h change, mcap; accepts symbols or coingecko ids
 chainq price 0xTokenAddress        # by contract address (any chain; -n hints the network)
+chainq price <SPL mint>            # Solana mints work like contract addresses
 chainq trending -l 10              # trending tokens right now
 chainq asset ethena                # full profile: price, mcap/fdv, supply, ATH, links
 chainq asset 0xTokenAddress -n base
@@ -30,7 +31,7 @@ chainq candles btc --days 30          # OHLC candles; granularity auto-scales (3
 chainq candles eth -d 7 -l 24 --json  # last 24 candles as JSON; -d window, -l caps rows shown
 ```
 
-Contract addresses work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only). Historical `--at`/`candles` need a CoinGecko-listed asset (symbol, id, or contract), and the public API only covers the last 365 days.
+Contract addresses and Solana mints work everywhere: `price`/`asset` locate the token via DexScreener, then pull CoinGecko data for it; tokens unknown to CoinGecko fall back to DexScreener pair data (marked `[dexscreener/<chain>]`, price/mcap only). Historical `--at`/`candles` need a CoinGecko-listed asset (symbol, id, contract, or mint), and the public API only covers the last 365 days.
 
 ## Stablecoins
 
