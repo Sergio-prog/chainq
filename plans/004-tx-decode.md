@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 4b48de2..HEAD -- chainq/commands/chain.py chainq/providers/ chainq/tokens.py`
+> **Drift check (run first)**: `git diff --stat d3e341e..HEAD -- chainq/commands/chain.py chainq/providers/ chainq/tokens.py`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,7 @@
 - **Risk**: MED (touches an existing core command; must not break its current output contract)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `4b48de2`, 2026-07-07
+- **Planned at**: commit `d3e341e`, 2026-07-16 (reconciled; finding still present)
 
 ## Why this matters
 
@@ -26,7 +26,7 @@ Most DeFi transactions carry `value: 0`, so today's `chainq tx` output for a swa
 
 ## Current state
 
-- `chainq/commands/chain.py:270-345` — the `tx` command (EVM path). Facts that matter:
+- `chainq/commands/chain.py:268-345` — the `tx` command (EVM path). Facts that matter:
   - `receipt = client.w3.eth.get_transaction_receipt(tx_hash)` is already fetched (chain.py:~291); `receipt["logs"]` is available and unused.
   - `transaction["input"]` (calldata) is available and unused.
   - Output today: status, from → to, native value + USD, fee + USD, block/time, explorer link. `data` dict keys at chain.py:308-325; text `lines` at chain.py:326-337.
@@ -135,7 +135,8 @@ Stop and report back if:
 
 - 4byte.directory's response shape differs from Step 1's description (verify live first — if the API is gone or now requires a key, report; do not swap in a different service unilaterally).
 - `receipt["logs"]` from web3 doesn't expose `topics`/`data` as bytes in the pinned web3 version — report the actual types before adapting.
-- The `tx` function has drifted from the excerpt locations (chain.py:270-345).
+- The `tx` function has drifted materially from the reconciled excerpt at
+  `chain.py:268-345`.
 
 ## Maintenance notes
 

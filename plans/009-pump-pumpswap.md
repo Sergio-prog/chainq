@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update this plan's row in
 > `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 7b4fb6f..HEAD -- chainq/solana.py chainq/providers/dexscreener.py chainq/providers/pump.py chainq/providers/uniswap.py chainq/commands/market.py chainq/commands/uniswap.py chainq/commands/pump.py chainq/commands/protocols.py tests/test_pump.py tests/test_solana.py tests/test_live.py README.md ROADMAP.md skills/chainq/SKILL.md site/public/llms.txt site/public/llms-full.txt`
+> **Drift check (run first)**: `git diff --stat 745a0bb..HEAD -- chainq/solana.py chainq/providers/dexscreener.py chainq/providers/pump.py chainq/providers/uniswap.py chainq/commands/market.py chainq/commands/uniswap.py chainq/commands/pump.py chainq/commands/protocols.py tests/test_pump.py tests/test_solana.py tests/test_live.py README.md ROADMAP.md skills/chainq/SKILL.md site/public/llms.txt site/public/llms-full.txt`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,7 @@
 - **Risk**: MED-HIGH (versioned binary account layouts plus third-party discovery)
 - **Depends on**: `plans/001-solana-mints-in-price-asset.md`
 - **Category**: direction
-- **Planned at**: commit `7b4fb6f`, 2026-07-10
+- **Planned at**: commit `745a0bb`, 2026-07-16 (reconciled after Plan 001)
 
 ## Why this matters
 
@@ -44,10 +44,12 @@ only for discovery and ranking that raw RPC cannot provide cheaply.
   human-scale prices.
 - `chainq/providers/uniswap.py:7-62` currently owns generic DexScreener HTTP
   access (`search_pairs`, `token_pairs`, and `_pair_row`) alongside
-  Uniswap-specific filtering. `chainq/commands/market.py:10-53` already consumes
-  those generic functions through the misleading `uniswap` module name. Pump
-  would become the second explicit non-Uniswap consumer, so extraction to
-  `providers/dexscreener.py` is justified now.
+  Uniswap-specific filtering. `chainq/commands/market.py:14-65` consumes those
+  functions through the misleading `uniswap` module name. Completed Plan 001
+  added `_token_address_matches`, `_contract_lookup_key`, and
+  `_dexscreener_chain_slug` for case-sensitive SPL-mint routing. Keep those
+  command-level helpers intact while moving only generic HTTP access to
+  `providers/dexscreener.py`.
 - `chainq/commands/protocols.py:3-20` mounts protocol apps; no Solana-native
   protocol is mounted.
 - Official sources to re-read at execution time:
@@ -183,7 +185,8 @@ Update:
 - `commands/uniswap.py` to fetch through `dexscreener`, then normalize through
   `uniswap.uniswap_rows`;
 - `commands/market.py` to fetch generic token pairs directly through
-  `dexscreener`.
+  `dexscreener`; preserve Plan 001's Solana-aware address matching and chain
+  slug helpers unchanged.
 
 Preserve all existing output shapes and cache TTLs. This is a mechanical move,
 not a redesign.
@@ -410,9 +413,8 @@ Stop and report back if:
 - Price direction cannot be established unambiguously from base/quote reserves.
 - The feature appears to require signing, SDK transaction builders, event
   indexing, or a new dependency.
-- Plan 001 changed `commands/market.py` in a way that conflicts with the
-  DexScreener extraction; reconcile the completed code first and update this
-  plan instead of overwriting it.
+- The live Plan 001 helpers differ from the reconciled `745a0bb` versions;
+  refresh the extraction around the new helpers instead of overwriting them.
 
 ## Maintenance notes
 

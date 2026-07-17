@@ -19,6 +19,8 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `4b48de2`, 2026-07-07
+- **Implemented**: branch `feat/solana-mints-price`, commit `745a0bb`; reviewed
+  and verified, not merged into `main`
 
 ## Why this matters
 

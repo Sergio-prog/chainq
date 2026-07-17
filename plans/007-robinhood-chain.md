@@ -19,6 +19,11 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `7b4fb6f`, 2026-07-10
+- **Implementation**: branch `feat/robinhood-chain`, commit `b0a46f5`; lint,
+  branch tests, and live gas verified on 2026-07-16
+- **Reconciliation status**: IN PROGRESS — the implementation predates v0.16
+  and conflicts with current `main` in docs and `tests/test_live.py`; rebase or
+  replay the focused network/test changes before merging
 
 ## Why this matters
 

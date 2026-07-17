@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 4b48de2..HEAD -- chainq/commands/protocols.py chainq/providers/ chainq/commands/hl.py`
+> **Drift check (run first)**: `git diff --stat d3e341e..HEAD -- chainq/commands/protocols.py chainq/providers/ chainq/commands/hl.py`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,7 @@
 - **Risk**: LOW-MED (new integration, no existing behavior changes; risk is upstream API shape drift)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `4b48de2`, 2026-07-07
+- **Planned at**: commit `d3e341e`, 2026-07-16 (reconciled; finding still present)
 
 ## Why this matters
 
