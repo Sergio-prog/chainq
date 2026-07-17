@@ -1,3 +1,4 @@
+import sys
 from inspect import signature
 
 from chainq.commands.yields import _filter_rows, _merge_results, _row, _yield_lines, yields
@@ -91,6 +92,21 @@ def test_text_output_truncates_long_markets():
 
     assert "…" in line
     assert "x" * 49 not in line
+
+
+def test_text_output_uses_showcase_colors(monkeypatch):
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm")
+    row = opportunity("USDC [Ethereum]", "usdc", 3.28, 2_130_000_000, protocol="aave")
+
+    line = _yield_lines([row])[0]
+
+    assert line.startswith("\033[32m3.28%\033[0m")
+    assert "\033[2mlending\033[0m" in line
+    assert "\033[2m(ethereum)\033[0m" in line
+    assert "\033[2mtvl\033[0m" in line
+    assert line.endswith("\033[1m$2.13B\033[0m")
 
 
 def test_asset_filter_respects_limit():

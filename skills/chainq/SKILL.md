@@ -60,7 +60,7 @@ chainq yields --min-tvl 0                  # include opportunities with any repo
 
 The `type` values (`lending`, `vault`, `staking`, `lp`, and `fixed`) are not risk-equivalent or directly comparable. LP yields carry impermanent-loss risk, and fixed yields have an expiry.
 
-Default text output aligns APY, type, market, network, and TVL into terminal columns. Use `--format table` when field headers are useful.
+Default text output aligns APY, type, market, network, and TVL into terminal columns. Interactive terminals color APY green, dim metadata, and emphasize TVL; captured output stays plain. Use `--format table` when field headers are useful.
 
 Prefer `price` for "how much is X"; use `asset` when the user wants depth (supply, FDV, ATH). If a symbol is ambiguous or unknown, run `search` first and use the returned id.
 

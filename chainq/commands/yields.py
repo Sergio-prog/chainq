@@ -11,7 +11,7 @@ from chainq.commands.morpho import _market_row as morpho_market_row
 from chainq.commands.morpho import _vault_row as morpho_vault_row
 from chainq.commands.pendle import _market_row as pendle_market_row
 from chainq.errors import ChainqError
-from chainq.fmt import dim, fmt_pct, humanize_num, humanize_usd
+from chainq.fmt import dim, green, humanize_num, humanize_usd
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import aave, aerodrome, curve, ethena, kamino, lido, morpho, pendle, sky
@@ -261,7 +261,7 @@ def _yield_lines(rows: list[dict]) -> list[str]:
     tvl_width = max(len(value) for value in tvls)
     lines = []
     for row, apy, kind, market, network, tvl in zip(rows, apys, kinds, markets, networks, tvls, strict=True):
-        apy_cell = " " * (apy_width - len(apy)) + fmt_pct(row["apy_pct"], signed=False)
+        apy_cell = " " * (apy_width - len(apy)) + green(apy)
         kind_cell = dim(kind.ljust(kind_width))
         market_cell = _fit(market, market_width).ljust(market_width)
         network_cell = dim(network.ljust(network_width))

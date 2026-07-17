@@ -94,7 +94,7 @@ chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, l
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
 
-The default yields text output aligns APY, type, market, network, and TVL into readable terminal columns. Use `--format table` for field headers or `--json` for structured data.
+The default yields text output aligns APY, type, market, network, and TVL into readable terminal columns. Interactive terminals color APY green, dim metadata, and emphasize TVL; piped output stays plain. Use `--format table` for field headers or `--json` for structured data.
 
 ### Onchain (EVM + Solana)
 
