@@ -2,6 +2,18 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## Unreleased
+
+### Features
+- add cross-protocol yields command
+- add Kamino lending markets
+- support Solana mints in market commands
+
+### Documentation
+- mark completed plans merged
+- reconcile implementation plans
+- regenerate changelog for v0.16.0
+
 ## v0.16.0
 
 ### Features
