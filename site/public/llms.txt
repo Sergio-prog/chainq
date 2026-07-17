@@ -1,6 +1,6 @@
 # chainq
 
-> Agent-first CLI for retrieving and transforming Web3 data. Query prices, wallets, DeFi, perps, NFTs, and raw RPC across 25 EVM networks + Solana; inspect EVM state, call contracts, encode/decode ABI data, hash signatures, and convert values. Zero setup, no API keys.
+> Agent-first CLI for retrieving and transforming Web3 data. Query prices, wallets, DeFi including Kamino Solana lending markets, perps, NFTs, and raw RPC across 25 EVM networks + Solana; inspect EVM state, call contracts, encode/decode ABI data, hash signatures, and convert values. Zero setup, no API keys.
 
 Install: `curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh` (or `brew install sergio-prog/tap/chainq`, `uv tool install chainq`, `pipx install chainq`). Requires Python 3.12+ (the script bootstraps uv).
 
