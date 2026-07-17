@@ -1,6 +1,6 @@
 from inspect import signature
 
-from chainq.commands.yields import _filter_rows, _merge_results, _row, yields
+from chainq.commands.yields import _filter_rows, _merge_results, _row, _yield_lines, yields
 
 
 def opportunity(
@@ -68,6 +68,29 @@ def test_tvl_sorting_is_descending():
     ]
 
     assert _filter_rows(rows, None, None, 1_000_000, "tvl", 15) == [rows[1], rows[2], rows[0]]
+
+
+def test_text_output_uses_aligned_columns():
+    rows = [
+        opportunity("short", "a", 3.2, 2_000_000_000, protocol="aave"),
+        opportunity("long market", "b", 12.34, 1_500_000, protocol="morpho"),
+    ]
+    rows[1]["type"] = "vault"
+    rows[1]["network"] = "base"
+
+    assert _yield_lines(rows) == [
+        " 3.20%  lending  aave short          (ethereum)  tvl $2.00B",
+        "12.34%  vault    morpho long market  (base)      tvl $1.50M",
+    ]
+
+
+def test_text_output_truncates_long_markets():
+    row = opportunity("x" * 100, "a", 3.2, 2_000_000_000, protocol="aave")
+
+    line = _yield_lines([row])[0]
+
+    assert "…" in line
+    assert "x" * 49 not in line
 
 
 def test_asset_filter_respects_limit():

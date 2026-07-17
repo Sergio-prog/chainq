@@ -11,7 +11,7 @@ from chainq.commands.morpho import _market_row as morpho_market_row
 from chainq.commands.morpho import _vault_row as morpho_vault_row
 from chainq.commands.pendle import _market_row as pendle_market_row
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_pct, humanize_usd
+from chainq.fmt import dim, fmt_pct, humanize_num, humanize_usd
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import aave, aerodrome, curve, ethena, kamino, lido, morpho, pendle, sky
@@ -22,6 +22,7 @@ SORTS = ("tvl", "apy")
 ETH_FAMILY = {"eth", "weth", "steth"}
 Task = tuple[str, Callable[[], list[dict]]]
 TaskResult = tuple[list[dict] | None, str | None]
+MARKET_WIDTH_LIMIT = 48
 
 
 def _row(
@@ -241,6 +242,35 @@ def _filter_rows(
     return sorted(rows, key=lambda row: row[sort_key] or 0, reverse=True)[:limit]
 
 
+def _fit(value: str, width: int) -> str:
+    if len(value) <= width:
+        return value
+    return value[: width - 1] + "…"
+
+
+def _yield_lines(rows: list[dict]) -> list[str]:
+    apys = [f"{row['apy_pct']:.2f}%" for row in rows]
+    kinds = [row["type"] for row in rows]
+    markets = [f"{row['protocol']} {row['market']}" for row in rows]
+    networks = [f"({row['network']})" for row in rows]
+    tvls = [f"${humanize_num(row['tvl_usd'])}" if row["tvl_usd"] is not None else "n/a" for row in rows]
+    apy_width = max(map(len, apys))
+    kind_width = max(map(len, kinds))
+    market_width = min(max(map(len, markets)), MARKET_WIDTH_LIMIT)
+    network_width = max(map(len, networks))
+    tvl_width = max(len(value) for value in tvls)
+    lines = []
+    for row, apy, kind, market, network, tvl in zip(rows, apys, kinds, markets, networks, tvls, strict=True):
+        apy_cell = " " * (apy_width - len(apy)) + fmt_pct(row["apy_pct"], signed=False)
+        kind_cell = dim(kind.ljust(kind_width))
+        market_cell = _fit(market, market_width).ljust(market_width)
+        network_cell = dim(network.ljust(network_width))
+        tvl_value = humanize_usd(row["tvl_usd"]) if row["tvl_usd"] is not None else tvl
+        tvl_cell = " " * (tvl_width - len(tvl)) + tvl_value
+        lines.append(f"{apy_cell}  {kind_cell}  {market_cell}  {network_cell}  {dim('tvl')} {tvl_cell}")
+    return lines
+
+
 def _tasks(networks: list[str]) -> list[Task]:
     tasks: list[Task] = []
     for network in networks:
@@ -299,9 +329,5 @@ def yields(
     rows = _filter_rows(rows, asset, kind, min_tvl, sort, limit)
     if not rows:
         raise ChainqError("no yield opportunities matched the filters")
-    lines = [
-        f"{fmt_pct(row['apy_pct'], signed=False)}  {row['type']}  {row['protocol']} {row['market']} "
-        f"({row['network']})  tvl {humanize_usd(row['tvl_usd']) if row['tvl_usd'] is not None else 'n/a'}"
-        for row in rows
-    ]
+    lines = _yield_lines(rows)
     out.emit(rows, lines, quiet_value=rows[0]["apy_pct"], verbose_lines=errors)

@@ -47,11 +47,11 @@
         <text x="735" y="314">(base)</text>
         <text x="735" y="358">(ethereum)</text>
         <text x="735" y="402">(base)</text>
-        <text x="855" y="226">tvl</text>
-        <text x="855" y="270">tvl</text>
-        <text x="855" y="314">tvl</text>
-        <text x="855" y="358">tvl</text>
-        <text x="855" y="402">tvl</text>
+        <text x="860" y="226">tvl</text>
+        <text x="860" y="270">tvl</text>
+        <text x="860" y="314">tvl</text>
+        <text x="860" y="358">tvl</text>
+        <text x="860" y="402">tvl</text>
       </g>
       <g fill="#f4e7c5">
         <text x="905" y="226">$2.13B</text>
