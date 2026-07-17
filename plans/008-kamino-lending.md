@@ -19,8 +19,8 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `7b4fb6f`, 2026-07-10
-- **Implemented**: branch `feat/kamino-markets`, commit `69dd211`; reviewed and
-  verified, not merged into `main`
+- **Implemented**: branch `feat/kamino-markets`, commit `69dd211`; reviewed,
+  verified, and merged via PR #4
 
 ## Why this matters
 

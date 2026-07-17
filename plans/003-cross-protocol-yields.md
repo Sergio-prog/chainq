@@ -20,7 +20,7 @@
 - **Category**: direction
 - **Planned at**: commit `7b4fb6f`, 2026-07-10 (refreshed to include Kamino)
 - **Implemented**: branch `feat/yields-command`, commit `fa74039`, stacked on
-  Plan 008; reviewed and verified, not merged into `main`
+  Plan 008; reviewed, verified, and merged via PR #3
 - **Live caveat**: source-reported Curve and Morpho APY outliers currently
   dominate the truthful global top-15 ranking
 

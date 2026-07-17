@@ -17,10 +17,10 @@ on the named branch uncommitted and report to the owner.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 007 | Add Robinhood Chain mainnet | P1 | S | — | IN PROGRESS — `b0a46f5` passes tests/live but conflicts with current `main` |
-| 008 | Add Kamino lending markets | P1 | M | — | DONE — `69dd211`, not merged |
-| 001 | Accept SPL mints in `price`/`asset` | P1 | S | — | DONE — `745a0bb`, not merged |
+| 008 | Add Kamino lending markets | P1 | M | — | DONE — merged via PR #4 |
+| 001 | Accept SPL mints in `price`/`asset` | P1 | S | — | DONE — merged via PR #5 |
 | 009 | Add read-only Pump/PumpSwap state | P1 | L | 001 | TODO |
-| 003 | `chainq yields` — cross-protocol yield comparison | P1 | M | 008 | DONE — `fa74039`, stacked on 008; live top 15 has source-reported APY outliers |
+| 003 | `chainq yields` — cross-protocol yield comparison | P1 | M | 008 | DONE — merged via PR #3; live top 15 has source-reported APY outliers |
 | 002 | `chainq read` — generic contract read | P1 | M | — | REJECTED — v0.16 independently shipped the capability as `chainq evm call` |
 | 004 | `chainq tx` decodes function + token transfers | P2 | M | — | TODO |
 | 005 | `uniswap quote` — amount-aware swap quotes | P2 | M | — | TODO |
@@ -54,8 +54,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Reconciliation notes — 2026-07-16
 
-- 001, 008, and 003 were independently reviewed in isolated worktrees; their
-  feature branches are clean but remain unmerged.
+- 001, 008, and 003 were independently reviewed in isolated worktrees and
+  merged through PRs #5, #4, and #3 respectively.
 - 007's existing pushed commit passes lint, its 62-test branch baseline, and a
   live Robinhood gas query. It conflicts with v0.16 docs and `tests/test_live.py`,
   so it remains IN PROGRESS pending rebase/conflict resolution.
