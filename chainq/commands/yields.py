@@ -18,6 +18,7 @@ from chainq.providers import aave, aerodrome, curve, ethena, kamino, lido, morph
 
 DEFAULT_NETWORKS = ("ethereum", "base", "solana")
 KINDS = ("lending", "vault", "staking", "lp", "fixed")
+SORTS = ("tvl", "apy")
 ETH_FAMILY = {"eth", "weth", "steth"}
 Task = tuple[str, Callable[[], list[dict]]]
 TaskResult = tuple[list[dict] | None, str | None]
@@ -223,13 +224,21 @@ def _asset_matches(row: dict, asset: str) -> bool:
     return query in tokens
 
 
-def _filter_rows(rows: list[dict], asset: str | None, kind: str | None, min_tvl: float, limit: int) -> list[dict]:
+def _filter_rows(
+    rows: list[dict],
+    asset: str | None,
+    kind: str | None,
+    min_tvl: float,
+    sort: str,
+    limit: int,
+) -> list[dict]:
     if asset:
         rows = [row for row in rows if _asset_matches(row, asset)]
     if kind:
         rows = [row for row in rows if row["type"] == kind]
     rows = [row for row in rows if row["apy_pct"] is not None and (row["tvl_usd"] or 0) >= min_tvl]
-    return sorted(rows, key=lambda row: row["apy_pct"], reverse=True)[:limit]
+    sort_key = "tvl_usd" if sort == "tvl" else "apy_pct"
+    return sorted(rows, key=lambda row: row[sort_key] or 0, reverse=True)[:limit]
 
 
 def _tasks(networks: list[str]) -> list[Task]:
@@ -261,7 +270,8 @@ def yields(
         list[str] | None, typer.Option("--network", "-n", help="network(s); default: ethereum, base, solana")
     ] = None,
     kind: Annotated[str | None, typer.Option("--type", help="lending | vault | staking | lp | fixed")] = None,
-    min_tvl: Annotated[float, typer.Option("--min-tvl", help="hide opportunities with TVL below this")] = 0,
+    min_tvl: Annotated[float, typer.Option("--min-tvl", help="minimum TVL in USD")] = 1_000_000,
+    sort: Annotated[str, typer.Option("--sort", "-s", help="tvl | apy")] = "tvl",
     limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -272,6 +282,8 @@ def yields(
     out = Out(json_out, quiet, verbose, format)
     if kind and kind not in KINDS:
         raise ChainqError(f"unknown yield type '{kind}' (use: {' | '.join(KINDS)})")
+    if sort not in SORTS:
+        raise ChainqError(f"unknown yield sort '{sort}' (use: {' | '.join(SORTS)})")
     if networks and any(network.lower() == "all" for network in networks):
         raise ChainqError("network 'all' is not supported; pass -n once per network")
     resolved = list(dict.fromkeys(resolve_network(network).key for network in networks)) if networks else list(DEFAULT_NETWORKS)
@@ -284,7 +296,7 @@ def yields(
     rows, errors = _merge_results(results)
     if len(errors) == len(tasks):
         raise ChainqError("all yield sources failed: " + "; ".join(errors))
-    rows = _filter_rows(rows, asset, kind, min_tvl, limit)
+    rows = _filter_rows(rows, asset, kind, min_tvl, sort, limit)
     if not rows:
         raise ChainqError("no yield opportunities matched the filters")
     lines = [

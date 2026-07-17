@@ -1,4 +1,6 @@
-from chainq.commands.yields import _filter_rows, _merge_results, _row
+from inspect import signature
+
+from chainq.commands.yields import _filter_rows, _merge_results, _row, yields
 
 
 def opportunity(
@@ -11,10 +13,17 @@ def opportunity(
     return _row(protocol, "ethereum", market, symbol, apy_pct, None, "lending", tvl_usd)
 
 
+def test_default_sort_and_minimum_tvl():
+    parameters = signature(yields).parameters
+
+    assert parameters["sort"].default == "tvl"
+    assert parameters["min_tvl"].default == 1_000_000
+
+
 def test_asset_filter_matches_symbol_and_market_name():
     rows = [opportunity("USDC Core", "usdc", 3), opportunity("ETH/USDC", "weth", 4), opportunity("DAI", "dai", 5)]
 
-    assert _filter_rows(rows, "USDC", None, 0, 15) == [rows[1], rows[0]]
+    assert _filter_rows(rows, "USDC", None, 0, "apy", 15) == [rows[1], rows[0]]
 
 
 def test_eth_asset_matches_token_family_without_matching_ethereum():
@@ -25,7 +34,7 @@ def test_eth_asset_matches_token_family_without_matching_ethereum():
         opportunity("ETH/USDC", "eth", 4),
     ]
 
-    assert _filter_rows(rows, "eth", None, 0, 15) == rows[1:]
+    assert _filter_rows(rows, "eth", None, 0, "apy", 15) == rows[1:]
 
 
 def test_asset_filter_respects_fixed_staking_symbols():
@@ -35,12 +44,12 @@ def test_asset_filter_respects_fixed_staking_symbols():
         opportunity("stETH", "steth", 3, protocol="lido"),
     ]
 
-    assert _filter_rows(rows, "usdc", None, 0, 15) == []
-    assert _filter_rows(rows, "usde", None, 0, 15) == [rows[1]]
-    assert _filter_rows(rows, "eth", None, 0, 15) == [rows[2]]
+    assert _filter_rows(rows, "usdc", None, 0, "apy", 15) == []
+    assert _filter_rows(rows, "usde", None, 0, "apy", 15) == [rows[1]]
+    assert _filter_rows(rows, "eth", None, 0, "apy", 15) == [rows[2]]
 
 
-def test_sorting_min_tvl_and_limit_are_applied_in_order():
+def test_apy_sorting_min_tvl_and_limit_are_applied_in_order():
     rows = [
         opportunity("low tvl", "a", 20, 5),
         opportunity("second", "b", 8, 100),
@@ -48,13 +57,23 @@ def test_sorting_min_tvl_and_limit_are_applied_in_order():
         opportunity("third", "d", 6, 100),
     ]
 
-    assert _filter_rows(rows, None, None, 10, 2) == [rows[2], rows[1]]
+    assert _filter_rows(rows, None, None, 10, "apy", 2) == [rows[2], rows[1]]
+
+
+def test_tvl_sorting_is_descending():
+    rows = [
+        opportunity("highest apy", "a", 20, 2_000_000),
+        opportunity("highest tvl", "b", 5, 10_000_000),
+        opportunity("middle tvl", "c", 8, 5_000_000),
+    ]
+
+    assert _filter_rows(rows, None, None, 1_000_000, "tvl", 15) == [rows[1], rows[2], rows[0]]
 
 
 def test_asset_filter_respects_limit():
     rows = [opportunity(f"USDC {index}", "usdc", index) for index in range(5)]
 
-    assert _filter_rows(rows, "usdc", None, 0, 2) == list(reversed(rows))[:2]
+    assert _filter_rows(rows, "usdc", None, 0, "apy", 2) == list(reversed(rows))[:2]
 
 
 def test_failing_source_becomes_verbose_note():

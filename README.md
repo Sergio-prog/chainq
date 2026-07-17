@@ -74,7 +74,7 @@ git clone https://github.com/Sergio-prog/chainq && cd chainq
 uv tool install .
 ```
 
-The install scripts bootstrap uv if it's missing (whether or not Python is already installed — uv provisions Python 3.12+ as needed). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
+The install scripts bootstrap uv if it's missing (whether or not Python is already installed — uv provisions Python 3.12+ as needed). Update any time with `chainq update`; package-manager output stays hidden unless you pass `-v`, and Homebrew updates run without a confirmation prompt. chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
 
 ## Commands
 
@@ -88,7 +88,8 @@ chainq price btc --at 2025-03-01 # historical price on a date (last 365 days)
 chainq candles btc --days 30     # OHLC candles; granularity auto-scales with the window
 chainq trending                  # trending assets right now
 chainq stables --min-mcap 1e9    # stablecoins by mcap: peg price, supply changes, mechanism
-chainq yields --asset usdc       # cross-protocol yields ranked by APY; types are not risk-equivalent
+chainq yields --asset usdc       # cross-protocol yields sorted by TVL; $1M minimum by default
+chainq yields -s apy --min-tvl 0 # sort by APY and include opportunities with any reported TVL
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```

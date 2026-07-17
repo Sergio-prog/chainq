@@ -15,6 +15,7 @@ Agent-friendly CLI for onchain and crypto market data. No API keys or setup need
 - `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
 - Errors: stderr + exit code 1. In `--json`/`--format json` mode the error is instead printed to stdout as `{"error": "..."}` (still exit 1) so you can branch on it without reading stderr. A CoinGecko rate-limit error means wait ~1 minute (or `chainq config set coingecko-api-key <key>`); RPC commands are not affected by it.
 - Persistent settings (API keys, custom RPCs, timeouts): `chainq config set/get/list/unset` — no manual .env editing needed.
+- Self-update with `chainq update`; it is concise and non-interactive by default. Use `chainq update -v` to show package-manager output.
 
 ## Market data (CoinGecko)
 
@@ -50,10 +51,11 @@ Depeg questions: `stables <symbol> --json` and check `price_usd` deviation from 
 ## Yields (cross-protocol)
 
 ```bash
-chainq yields                              # ranked opportunities across default networks
+chainq yields                              # opportunities sorted by TVL; default minimum TVL is $1M
 chainq yields --asset usdc                 # compare one asset across protocols and yield types
 chainq yields --asset eth -n ethereum      # Ethereum opportunities, including stETH staking
-chainq yields --type lp --min-tvl 1000000  # LP yields above a TVL floor
+chainq yields --type lp -s apy             # LP yields sorted by APY; sort: tvl | apy
+chainq yields --min-tvl 0                  # include opportunities with any reported TVL
 ```
 
 The `type` values (`lending`, `vault`, `staking`, `lp`, and `fixed`) are not risk-equivalent or directly comparable. LP yields carry impermanent-loss risk, and fixed yields have an expiry.
