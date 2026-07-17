@@ -88,6 +88,7 @@ chainq price btc --at 2025-03-01 # historical price on a date (last 365 days)
 chainq candles btc --days 30     # OHLC candles; granularity auto-scales with the window
 chainq trending                  # trending assets right now
 chainq stables --min-mcap 1e9    # stablecoins by mcap: peg price, supply changes, mechanism
+chainq yields --asset usdc       # cross-protocol yields ranked by APY; types are not risk-equivalent
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
