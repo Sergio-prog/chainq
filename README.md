@@ -83,6 +83,7 @@ The install scripts bootstrap uv if it's missing (whether or not Python is alrea
 ```bash
 chainq price eth btc sol         # spot price, 24h change, market cap
 chainq price 0xTokenAddress      # any token by contract address (DexScreener fallback for long-tail)
+chainq price <SPL mint>          # Solana mint address
 chainq price btc --at 2025-03-01 # historical price on a date (last 365 days)
 chainq candles btc --days 30     # OHLC candles; granularity auto-scales with the window
 chainq trending                  # trending assets right now

@@ -10,15 +10,27 @@ from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, uniswap
 from chainq.providers.uniswap_data import CHAIN_SLUGS
 
-SLUG_TO_NETWORK = {slug: key for key, slug in CHAIN_SLUGS.items()}
+
+def _token_address_matches(query: str, candidate: str) -> bool:
+    if coingecko.is_solana_mint(query):
+        return candidate == query
+    return candidate.lower() == query.lower()
+
+
+def _contract_lookup_key(address: str, network_key: str | None) -> str | None:
+    return "solana" if coingecko.is_solana_mint(address) else network_key
+
+
+def _dexscreener_chain_slug(network_key: str | None) -> str | None:
+    return "solana" if network_key == "solana" else CHAIN_SLUGS.get(network_key)
 
 
 def _dexscreener_best_pair(address: str, network_key: str | None) -> dict | None:
     pairs = [
         p
         for p in uniswap.token_pairs(address)
-        if ((p.get("baseToken") or {}).get("address") or "").lower() == address.lower()
-        and (network_key is None or p.get("chainId") == CHAIN_SLUGS.get(network_key))
+        if _token_address_matches(address, (p.get("baseToken") or {}).get("address") or "")
+        and (network_key is None or p.get("chainId") == _dexscreener_chain_slug(network_key))
     ]
     if not pairs:
         return None
@@ -42,11 +54,11 @@ def _dexscreener_price_row(address: str, best: dict) -> dict:
 
 
 def _locate_contract(address: str, network_key: str | None) -> tuple[dict | None, dict | None]:
-    best_pair = _dexscreener_best_pair(address, network_key)
-    lookup_key = network_key or (SLUG_TO_NETWORK.get(best_pair.get("chainId")) if best_pair else None)
+    lookup_key = _contract_lookup_key(address, network_key)
+    best_pair = _dexscreener_best_pair(address, lookup_key)
     coin = None
     try:
-        coin = coingecko.by_contract(address, lookup_key) if (lookup_key or best_pair is None) else None
+        coin = coingecko.by_contract(address, lookup_key)
     except ChainqError:
         if best_pair is None:
             raise
@@ -54,7 +66,7 @@ def _locate_contract(address: str, network_key: str | None) -> tuple[dict | None
 
 
 def _resolve_coin_id(query: str, network_key: str | None) -> str:
-    if coingecko.is_address(query):
+    if coingecko.is_address(query) or coingecko.is_solana_mint(query):
         coin, _ = _locate_contract(query, network_key)
         if coin is None:
             raise ChainqError(f"no CoinGecko asset for contract {query}; historical data needs a listed asset")
@@ -117,7 +129,7 @@ def price(
     entries: list[tuple[str, str | None, dict | None]] = []
     ids = []
     for query in assets:
-        if coingecko.is_address(query):
+        if coingecko.is_address(query) or coingecko.is_solana_mint(query):
             coin, best_pair = _locate_contract(query, network_key)
             if coin:
                 entries.append((query, coin["id"], None))
@@ -230,7 +242,7 @@ def asset(
 ):
     """Detailed asset profile: price, caps, supply, ATH, links."""
     out = Out(json_out, quiet, verbose, format)
-    if coingecko.is_address(query):
+    if coingecko.is_address(query) or coingecko.is_solana_mint(query):
         network_key = resolve_network(network).key if network else None
         c, _ = _locate_contract(query, network_key)
         if c is None:
