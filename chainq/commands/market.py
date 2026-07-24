@@ -5,6 +5,7 @@ import typer
 
 from chainq.errors import ChainqError
 from chainq.fmt import dim, fmt_pct, fmt_usd, humanize_num, humanize_usd
+from chainq.links import asset_links, configured_providers
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, uniswap
@@ -235,6 +236,9 @@ def trending(
 def asset(
     query: Annotated[str, typer.Argument(help="asset symbol, CoinGecko id, or token contract address")],
     network: Annotated[str | None, typer.Option("--network", "-n", help="network hint for contract addresses")] = None,
+    links: Annotated[
+        str | None, typer.Option("--links", help="link providers (comma-separated): tradingview,binance,coingecko")
+    ] = None,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
@@ -242,6 +246,7 @@ def asset(
 ):
     """Detailed asset profile: price, caps, supply, ATH, links."""
     out = Out(json_out, quiet, verbose, format)
+    link_providers = configured_providers(links)
     if coingecko.is_address(query) or coingecko.is_solana_mint(query):
         network_key = resolve_network(network).key if network else None
         c, _ = _locate_contract(query, network_key)
@@ -272,6 +277,7 @@ def asset(
         "ath_date": md["ath_date"].get("usd"),
         "homepage": next((u for u in c.get("links", {}).get("homepage", []) if u), None),
         "categories": [cat for cat in c.get("categories") or [] if cat][:5],
+        "links": asset_links(c["symbol"], c["id"], link_providers),
         "source": "coingecko",
     }
     lines = [
@@ -288,6 +294,8 @@ def asset(
         lines.append(
             f"  {dim('ath')} {fmt_usd(ath)} ({fmt_pct(data['ath_change_pct'])} from ath, {str(data['ath_date'])[:10]})"
         )
+    for name, url in data["links"].items():
+        lines.append(f"  {dim(name)} {url}")
     out.emit(
         data,
         lines,

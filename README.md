@@ -91,10 +91,27 @@ chainq stables --min-mcap 1e9    # stablecoins by mcap: peg price, supply change
 chainq yields --asset usdc       # cross-protocol yields sorted by TVL; $1M minimum by default
 chainq yields -s apy --min-tvl 0 # sort by APY and include opportunities with any reported TVL
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
+chainq asset btc --links tradingview,binance,coingecko  # add chart/exchange links (default: TradingView)
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
 
 The default yields text output aligns APY, type, market, network, and TVL into readable terminal columns. Interactive terminals color APY green, dim metadata, and emphasize TVL; piped output stays plain. Use `--format table` for field headers or `--json` for structured data.
+
+`chainq asset` appends an asset link line (TradingView by default). Choose providers with `--links tradingview,binance,coingecko`, or set a persistent default with `chainq config set asset-links binance,coingecko` (or the `CHAINQ_ASSET_LINKS` env var).
+
+### Buybacks & ETF flows
+
+```bash
+chainq buybacks hype -d 30       # last 30 days of Assistance Fund spot buys (daily)
+chainq buybacks sky              # SKY bought by the Sky Smart Burn Engine, per UTC day
+chainq buybacks uni -d 14        # UNI burned by the onchain Firepit Released events, per day
+chainq buybacks hype sky uni     # several programs in one call, each at its own cadence
+chainq buybacks zro --format table  # LayerZero monthly rows with source + provenance
+chainq etf btc -d 7              # daily US spot Bitcoin ETF net flows, per issuer + total (The Block)
+chainq etf eth --json           # Ethereum ETF flows as structured JSON
+```
+
+`buybacks` takes one or more programs — **hype, sky, uni, zro** (plus `lit`, see below) — and never guesses a default set, so you only pay for the sources you ask for. Each program is reported at its actual cadence and carries its `source`, `source_url`, and `provenance` (`live` or `snapshot`) on every row; the text view aligns period/amount/cost/avg into a table with a totals row, and drops columns a program doesn't report. HYPE is live (Hyperliquid Assistance Fund spot fills, daily); SKY is live onchain (Smart Burn Engine `Exec` events — `MCD_FLAP` resolved from the Sky chainlog — ~every 4h, bucketed per day); UNI is live onchain (Firepit `Released` burn events, per day); ZRO is parsed live from the LayerZero foundation tracker (monthly) and falls back to a clearly-labeled retained snapshot if the page is unreachable. LIT is intentionally not synthesized: the Lighter treasury buys LIT via daily TWAP, but that account's fills are auth-gated, so `chainq buybacks lit` reports the exact data limitation instead of inventing numbers. `etf` pulls daily net flows from The Block's public data API (no key required) with source attribution.
 
 ### Onchain (EVM + Solana)
 
@@ -239,6 +256,7 @@ Values live in `~/.config/chainq/.env`; plain env vars and a `.env` in cwd work 
 | `CHAINQ_HTTP_TIMEOUT` / `CHAINQ_RPC_TIMEOUT` | timeouts in seconds |
 | `CHAINQ_NO_UPDATE_CHECK` | disable the daily update check |
 | `OPENSEA_API_KEY` | unlocks `nft top` and long-tail collection slugs |
+| `CHAINQ_ASSET_LINKS` | default `asset` link providers (e.g. `tradingview,binance,coingecko`) |
 
 ## For AI agents
 

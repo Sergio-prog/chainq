@@ -12,6 +12,7 @@ CONFIG_PATH = Path.home() / ".config" / "chainq" / ".env"
 KNOWN_KEYS = (
     "COINGECKO_API_KEY",
     "OPENSEA_API_KEY",
+    "CHAINQ_ASSET_LINKS",
     "CHAINQ_HTTP_TIMEOUT",
     "CHAINQ_RPC_TIMEOUT",
     "CHAINQ_NO_UPDATE_CHECK",

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     opensea_api_key: str | None = Field(
         None, validation_alias=AliasChoices("CHAINQ_OPENSEA_API_KEY", "OPENSEA_API_KEY")
     )
+    asset_links: str | None = Field(None, validation_alias=AliasChoices("CHAINQ_ASSET_LINKS", "ASSET_LINKS"))
     http_timeout: float = Field(10.0, validation_alias="CHAINQ_HTTP_TIMEOUT")
     rpc_timeout: float = Field(6.0, validation_alias="CHAINQ_RPC_TIMEOUT")
 

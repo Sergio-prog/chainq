@@ -1,6 +1,6 @@
 [project]
 name = "chainq"
-version = "0.17.1"
+version = "0.18.0"
 description = "Agent-friendly CLI for retrieving and transforming crypto and onchain data across EVM, Solana, markets, and DeFi."
 readme = "README.md"
 license = "MIT"

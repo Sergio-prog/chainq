@@ -7,7 +7,20 @@ import typer
 from web3.exceptions import Web3Exception
 
 from chainq import __version__, fmt, update
-from chainq.commands import address, chain, config, evm, market, nft, portfolio, protocols, stables, yields
+from chainq.commands import (
+    address,
+    buybacks,
+    chain,
+    config,
+    etf,
+    evm,
+    market,
+    nft,
+    portfolio,
+    protocols,
+    stables,
+    yields,
+)
 from chainq.errors import ChainqError
 
 app = typer.Typer(
@@ -52,6 +65,8 @@ app.command()(market.trending)
 app.command()(market.candles)
 app.command()(stables.stables)
 app.command()(yields.yields)
+app.command()(buybacks.buybacks)
+app.command()(etf.etf)
 app.command()(update.update)
 app.add_typer(protocols.app, name="protocols")
 app.add_typer(nft.app, name="nft")
@@ -62,6 +77,12 @@ app.add_typer(config.app, name="config")
 def version():
     """Print chainq version."""
     print(__version__)
+
+
+@app.command()
+def help(ctx: typer.Context):
+    """Show top-level help (same as `chainq --help`)."""
+    print(ctx.parent.get_help())
 
 
 def _wants_json() -> bool:
