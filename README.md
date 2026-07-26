@@ -127,7 +127,7 @@ chainq portfolio 0x... --defi --hide-unpriced         # fold in Hyperliquid perp
 chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
 chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
-chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
+chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block, decoded ERC-20 transfers + called function
 chainq tx 5Ufd... -n solana                           # Solana signature lookup
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch (getSlot on solana)
 ```

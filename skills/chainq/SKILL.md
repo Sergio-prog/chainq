@@ -92,7 +92,7 @@ chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
 chainq address 0xADDR -n base                                 # what IS this: EOA vs contract, proxy impl, holdings
 chainq gas -n base                                            # gas price, base fee, transfer cost in USD
-chainq tx 0xHASH -n ethereum                                  # status, parties, value, fee, block
+chainq tx 0xHASH -n ethereum                                  # status, parties, value, fee, block, decoded ERC-20 transfers + called function
 chainq rpc eth_blockNumber -n optimism                        # raw JSON-RPC escape hatch, prints JSON
 chainq rpc eth_getBlockByNumber latest false                  # params: JSON literals parsed, rest strings
 ```

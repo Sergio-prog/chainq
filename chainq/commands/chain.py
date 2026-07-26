@@ -5,6 +5,7 @@ from statistics import median
 from typing import Annotated
 
 import typer
+from web3 import Web3
 from web3.exceptions import TransactionNotFound
 from web3.types import RPCEndpoint
 
@@ -13,9 +14,20 @@ from chainq.errors import ChainqError
 from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
-from chainq.providers import coingecko
-from chainq.rpc import connect, decode_string, decode_uint, encode_erc20, erc20, multicall, resolve_address
+from chainq.providers import coingecko, fourbyte
+from chainq.rpc import (
+    connect,
+    decode_address,
+    decode_string,
+    decode_uint,
+    encode_erc20,
+    erc20,
+    multicall,
+    resolve_address,
+)
 from chainq.tokens import MINT_TO_SYMBOL, resolve_token
+
+TRANSFER_TOPIC = Web3.keccak(text="Transfer(address,address,uint256)")
 
 NetworkOpt = Annotated[str, typer.Option("--network", "-n", help="network key, alias, or chain id")]
 
@@ -265,6 +277,51 @@ def _solana_tx(out: Out, signature: str, net) -> None:
     )
 
 
+def _token_metadata(client, addresses: list[str]) -> dict[str, tuple[str | None, int | None]]:
+    if not addresses:
+        return {}
+    calls = []
+    for address in addresses:
+        calls.append((address, encode_erc20("symbol")))
+        calls.append((address, encode_erc20("decimals")))
+    results = multicall(client, calls)
+    memo = {}
+    for i, address in enumerate(addresses):
+        symbol, decimals = results[2 * i], results[2 * i + 1]
+        memo[address] = (
+            decode_string(symbol) if symbol else None,
+            decode_uint(decimals) if decimals else None,
+        )
+    return memo
+
+
+def _decode_transfers(client, receipt) -> list[dict]:
+    logs = [log for log in receipt["logs"] if len(log["topics"]) == 3 and log["topics"][0] == TRANSFER_TOPIC]
+    if not logs:
+        return []
+    shown = logs[:10]
+    extra = len(logs) - len(shown)
+    metadata = _token_metadata(client, sorted({log["address"] for log in shown}))
+    rows = []
+    for log in shown:
+        token = log["address"]
+        symbol, decimals = metadata.get(token, (None, None))
+        raw = decode_uint(log["data"]) if log["data"] else 0
+        amount = Decimal(raw) / Decimal(10**decimals) if decimals is not None else Decimal(raw)
+        rows.append(
+            {
+                "token": token,
+                "symbol": symbol or short_addr(token),
+                "amount": float(amount),
+                "from": decode_address(log["topics"][1]),
+                "to": decode_address(log["topics"][2]),
+            }
+        )
+    if extra:
+        rows.append({"note": f"+{extra} more"})
+    return rows
+
+
 def tx(
     tx_hash: Annotated[str, typer.Argument(help="transaction hash (or Solana signature)")],
     network: NetworkOpt = "ethereum",
@@ -305,6 +362,13 @@ def tx(
         timestamp = datetime.fromtimestamp(block["timestamp"], tz=UTC)
     price = coingecko.try_price_usd(net.native_coingecko_id)
     to_address = transaction.get("to")
+    function_name = None
+    token_transfers: list[dict] = []
+    if receipt is not None:
+        if len(transaction["input"]) >= 4:
+            selector = "0x" + transaction["input"][:4].hex().removeprefix("0x")
+            function_name = fourbyte.signature(selector) or selector
+        token_transfers = _decode_transfers(client, receipt)
     data = {
         "hash": transaction["hash"].hex(),
         "network": net.key,
@@ -321,6 +385,8 @@ def tx(
         "gas_used": receipt["gasUsed"] if receipt else None,
         "gas_limit": transaction["gas"],
         "explorer": f"{net.explorer}/tx/0x{transaction['hash'].hex().removeprefix('0x')}",
+        "function": function_name,
+        "token_transfers": token_transfers,
     }
     lines = [
         f"Tx {short_addr(tx_hash)} on {net.name}: {status}",
@@ -330,6 +396,17 @@ def tx(
         + (f", fee {fmt_amount(fee)} {net.native_symbol}" if fee is not None else "")
         + (f" (~{fmt_usd(data['fee_usd'])})" if data["fee_usd"] else ""),
     ]
+    if function_name:
+        lines.append(f"  calls {function_name}")
+    transfer_rows = [row for row in token_transfers if "note" not in row]
+    if transfer_rows:
+        lines.append("  transfers:")
+        for row in transfer_rows:
+            arrow = f"{short_addr(row['from'])} → {short_addr(row['to'])}"
+            lines.append(f"    {fmt_amount(row['amount'])} {row['symbol']}: {arrow}")
+        extra_note = next((row["note"] for row in token_transfers if "note" in row), None)
+        if extra_note:
+            lines.append(f"    … {extra_note} transfers")
     if data["block"] is not None:
         when = f" at {timestamp.strftime('%Y-%m-%d %H:%M UTC')}" if timestamp else ""
         lines.append(f"  block {data['block']}{when}")
