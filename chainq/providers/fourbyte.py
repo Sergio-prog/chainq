@@ -19,10 +19,10 @@ def signature(selector: str) -> str | None:
         return None
     try:
         results = resp.json().get("results") or []
+        text_signature = results[0]["text_signature"]
     except Exception:
         return None
-    if not results:
+    if not isinstance(text_signature, str):
         return None
-    text_signature = results[0]["text_signature"]
     cache.put(key, text_signature, ttl=86400)
     return text_signature

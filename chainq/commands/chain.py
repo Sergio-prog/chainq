@@ -301,7 +301,10 @@ def _decode_transfers(client, receipt) -> list[dict]:
         return []
     shown = logs[:10]
     extra = len(logs) - len(shown)
-    metadata = _token_metadata(client, sorted({log["address"] for log in shown}))
+    try:
+        metadata = _token_metadata(client, sorted({log["address"] for log in shown}))
+    except Exception:
+        metadata = {}
     rows = []
     for log in shown:
         token = log["address"]

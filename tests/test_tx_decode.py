@@ -1,4 +1,5 @@
 from chainq.commands import chain
+from chainq.providers import fourbyte
 
 TOKEN = "0x1111111111111111111111111111111111111111"
 FROM = "0x2222222222222222222222222222222222222222"
@@ -79,3 +80,28 @@ def test_unknown_token_metadata_falls_back_to_short_address(monkeypatch):
     monkeypatch.setattr(chain, "_token_metadata", lambda client, addresses: {})
     rows = chain._decode_transfers(None, {"logs": [_transfer_log()]})
     assert rows[0]["symbol"] == chain.short_addr(TOKEN)
+
+
+def test_token_metadata_failure_degrades_to_short_address_and_raw_amount(monkeypatch):
+    def _raise(client, addresses):
+        raise RuntimeError("multicall rpc failure")
+
+    monkeypatch.setattr(chain, "_token_metadata", _raise)
+    rows = chain._decode_transfers(None, {"logs": [_transfer_log(amount=500)]})
+    assert rows == [{"token": TOKEN, "symbol": chain.short_addr(TOKEN), "amount": 500.0, "from": FROM, "to": TO}]
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+        self.status_code = 200
+
+    def json(self):
+        return self._payload
+
+
+def test_fourbyte_signature_malformed_results_returns_none(monkeypatch):
+    monkeypatch.setattr(fourbyte.cache, "get", lambda key: None)
+    monkeypatch.setattr(fourbyte.cache, "put", lambda key, value, ttl: None)
+    monkeypatch.setattr(fourbyte.http, "get", lambda *args, **kwargs: _FakeResponse({"results": [{"id": 1}]}))
+    assert fourbyte.signature("0xaaaaaaaa") is None
