@@ -19,6 +19,15 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `d3e341e`, 2026-07-16 (reconciled; finding still present)
+- **Implemented**: branch `feat/tx-decode`, commits `1ee0671` + `e08d800`, based
+  on `main` at `a18daab`. Executed by a subagent in an isolated worktree and
+  reviewed over two rounds on 2026-07-26; **APPROVED and opened as PR #6**
+  (<https://github.com/Sergio-prog/chainq/pull/6>) — the merge decision is the
+  owner's. Round 1 was returned for two defects (unguarded
+  metadata `multicall` could abort the whole `tx` command; `fourbyte.signature`
+  could raise on a malformed payload); both fixed in round 2. Final state: ruff
+  clean, 140 passed / 24 deselected, scope limited to the 5 in-scope files, and
+  a confirmed plain ETH send produces byte-identical output to `main`.
 
 ## Why this matters
 
@@ -141,5 +150,7 @@ Stop and report back if:
 ## Maintenance notes
 
 - Selector collisions are real: the function line is best-effort labeling, never load-bearing — reviewers should reject any future logic that *branches* on the 4byte name.
+- Known follow-up (as-implemented, plan-compliant): the function name is gated behind `receipt is not None` alongside the transfer decoding, so a *pending* tx shows no `calls …` line even though the selector comes from `transaction["input"]` and needs no receipt. This matches this plan's literal "pending txs skip both enrichments" instruction; if pending-tx labeling is later wanted, split the two conditions.
+- Any enrichment added to `tx` must degrade silently rather than raise — `tx` is a core command and its baseline output (status/parties/value/fee/block) must survive a failing decoder, price lookup, or metadata call.
 - Adding ERC-721/1155 support later = relax the 3-topic filter + tokenId decoding; the cap and multicall metadata batch already generalize.
 - If a `chainq read`-style ABI layer lands (plans/002), revisit argument decoding for the top ~20 selectors.

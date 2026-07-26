@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat d3e341e..HEAD -- chainq/commands/protocols.py chainq/providers/ chainq/commands/hl.py`
+> **Drift check (run first)**: `git diff --stat a18daab..HEAD -- chainq/commands/protocols.py chainq/providers/ chainq/commands/hl.py`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,7 @@
 - **Risk**: LOW-MED (new integration, no existing behavior changes; risk is upstream API shape drift)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `d3e341e`, 2026-07-16 (reconciled; finding still present)
+- **Planned at**: commit `a18daab`, 2026-07-26 (reconciled; finding still present — no Polymarket module or mount exists)
 
 ## Why this matters
 
@@ -28,17 +28,28 @@ This is a deliberate category expansion beyond DeFi-native data — the maintain
 
 ## Current state
 
-- `chainq/commands/protocols.py` — protocol subcommands mount here:
+- `chainq/commands/protocols.py` — the whole file is 24 lines; protocol subcommands mount here:
 
   ```python
-  # protocols.py:9-20
+  import typer
+
+  from chainq.commands import aave, aerodrome, curve, ethena, hl, kamino, lido, lighter, llama, morpho, pendle, sky, uniswap
+
+  app = typer.Typer(
+      no_args_is_help=True,
+      help=(
+          "Protocol integrations: Aave, Morpho, Kamino, Hyperliquid, Lighter, Uniswap, Curve, Pendle, Sky, "
+          "Ethena, Lido, Aerodrome."
+      ),
+  )
   app.add_typer(hl.app, name="hl")
   app.add_typer(aave.app, name="aave")
   ...
+  app.add_typer(llama.app, name="llama")
   ```
 
-  Add `app.add_typer(polymarket.app, name="polymarket")` and extend the help string at protocols.py:7.
-- `chainq/providers/pendle.py` (~30 lines) — the minimal provider exemplar: `http.get` (from `chainq/http.py`, has retry/backoff), `httpx.HTTPError` → `ChainqError`, `cache.key_for`/`get`/`put` (TTL 30–300s for market data), `settings.http_timeout`.
+  Add `polymarket` to the import list (alphabetical), append `app.add_typer(polymarket.app, name="polymarket")` to the mount block, and add Polymarket to the help string at protocols.py:8-9.
+- `chainq/providers/pendle.py` (25 lines) — the minimal provider exemplar: `http.get` (from `chainq/http.py`, has retry/backoff), `httpx.HTTPError` → `ChainqError`, `cache.key_for`/`get`/`put` (TTL 30–300s for market data), `settings.http_timeout`.
 - `chainq/commands/hl.py` — the closest command-layer exemplar (its `outcomes` command renders prediction markets; match its vocabulary: outcome, probability/price, volume, resolution).
 - `chainq/commands/ethena.py` — minimal command file shape (`Out`, `out.emit(data, lines, quiet_value, verbose_lines)`).
 - Output contract (non-negotiable): `--json` / `-q` / `-v` / `--format text|json|table|toon`; one human-readable line per result; errors → stderr, exit 1.

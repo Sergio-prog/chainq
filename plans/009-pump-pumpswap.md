@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update this plan's row in
 > `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 745a0bb..HEAD -- chainq/solana.py chainq/providers/dexscreener.py chainq/providers/pump.py chainq/providers/uniswap.py chainq/commands/market.py chainq/commands/uniswap.py chainq/commands/pump.py chainq/commands/protocols.py tests/test_pump.py tests/test_solana.py tests/test_live.py README.md ROADMAP.md skills/chainq/SKILL.md site/public/llms.txt site/public/llms-full.txt`
+> **Drift check (run first)**: `git diff --stat a18daab..HEAD -- chainq/solana.py chainq/providers/dexscreener.py chainq/providers/pump.py chainq/providers/uniswap.py chainq/commands/market.py chainq/commands/uniswap.py chainq/commands/pump.py chainq/commands/protocols.py tests/test_pump.py tests/test_solana.py tests/test_live.py README.md ROADMAP.md skills/chainq/SKILL.md site/public/llms.txt site/public/llms-full.txt`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,7 @@
 - **Risk**: MED-HIGH (versioned binary account layouts plus third-party discovery)
 - **Depends on**: `plans/001-solana-mints-in-price-asset.md`
 - **Category**: direction
-- **Planned at**: commit `745a0bb`, 2026-07-16 (reconciled after Plan 001)
+- **Planned at**: commit `a18daab`, 2026-07-26 (reconciled after Plan 001; Plan 001 is merged into `main`, so start from `main` — the older instruction to branch from `feat/solana-mints-price` no longer applies). Since the last reconcile `chainq/commands/market.py` gained an unrelated `--links` option on `asset` (lines ~236-300); the DexScreener routing region this plan touches (`market.py:14-65`, helpers `_token_address_matches`, `_contract_lookup_key`, `_dexscreener_chain_slug`) is byte-identical, and `chainq/providers/uniswap.py` and `chainq/solana.py` are unchanged. Verified 2026-07-26: no `pump` module, provider, or mount exists.
 
 ## Why this matters
 

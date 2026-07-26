@@ -21,6 +21,9 @@
 - **Planned at**: commit `7b4fb6f`, 2026-07-10 (refreshed to include Kamino)
 - **Implemented**: branch `feat/yields-command`, commit `fa74039`, stacked on
   Plan 008; reviewed, verified, and merged via PR #3
+- **Re-verified on `main` at `a18daab`, 2026-07-26**: `chainq yields -l 3`
+  returns live rows across Sky and Aave and exits 0; `tests/test_yields.py`
+  passes. Output has since been aligned and colorized (`50fb208`, `5667993`)
 - **Live caveat**: source-reported Curve and Morpho APY outliers currently
   dominate the truthful global top-15 ranking
 

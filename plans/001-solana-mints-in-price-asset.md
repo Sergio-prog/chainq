@@ -21,6 +21,10 @@
 - **Planned at**: commit `4b48de2`, 2026-07-07
 - **Implemented**: branch `feat/solana-mints-price`, commit `745a0bb`; reviewed,
   verified, and merged via PR #5
+- **Re-verified on `main` at `a18daab`, 2026-07-26**: `chainq price <JUP mint>`
+  and `chainq asset <BONK mint>` both resolve and exit 0; the routing helpers
+  `_token_address_matches`, `_contract_lookup_key`, `_dexscreener_chain_slug`
+  are intact at `chainq/commands/market.py:15,21,25`
 
 ## Why this matters
 

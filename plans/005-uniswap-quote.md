@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 4b48de2..HEAD -- chainq/commands/uniswap.py chainq/providers/uniswap_data.py chainq/rpc.py`
+> **Drift check (run first)**: `git diff --stat a18daab..HEAD -- chainq/commands/uniswap.py chainq/providers/uniswap_data.py chainq/rpc.py`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,7 @@
 - **Risk**: MED (new curated contract addresses; wrong address = wrong numbers presented confidently)
 - **Depends on**: none (plans/002 is unrelated; this uses its own ABI)
 - **Category**: direction
-- **Planned at**: commit `4b48de2`, 2026-07-07
+- **Planned at**: commit `a18daab`, 2026-07-26 (reconciled — all three in-scope files are byte-identical to the original `4b48de2` planning commit, so every "Current state" line number below is still accurate; `uniswap.py` has only `pools`, `pool`, `stats` — no `quote`)
 
 ## Why this matters
 

@@ -6,10 +6,13 @@
 > report — do not improvise. When done, update this plan's row in
 > `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 7b4fb6f..HEAD -- chainq/networks.py tests/test_networks.py tests/test_live.py README.md ROADMAP.md skills/chainq/SKILL.md site/index.html site/public/llms.txt site/public/llms-full.txt`
+> **Drift check (run first)**: `git diff --stat a18daab..HEAD -- chainq/networks.py tests/test_networks.py tests/test_live.py README.md ROADMAP.md skills/chainq/SKILL.md site/index.html site/public/llms.txt site/public/llms-full.txt`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Read "Step 0" before anything else** — a working implementation of this plan
+> already exists on a branch and this is a replay, not a from-scratch build.
 
 ## Status
 
@@ -18,12 +21,22 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `7b4fb6f`, 2026-07-10
-- **Implementation**: branch `feat/robinhood-chain`, commit `b0a46f5`; lint,
-  branch tests, and live gas verified on 2026-07-16
-- **Reconciliation status**: IN PROGRESS — the implementation predates v0.16
-  and conflicts with current `main` in docs and `tests/test_live.py`; rebase or
-  replay the focused network/test changes before merging
+- **Planned at**: commit `a18daab`, 2026-07-26 (reconciled)
+- **Implementation**: branch `feat/robinhood-chain`, commit `b0a46f5` (one
+  commit, based on `7b4fb6f`); lint, branch tests, and live gas verified
+  2026-07-16
+- **Reconciliation status**: IN PROGRESS — code merges clean, docs do not.
+  Verified read-only on 2026-07-26 with
+  `git merge-tree --write-tree --name-only main feat/robinhood-chain`:
+  `chainq/networks.py`, `tests/test_networks.py`, `tests/test_live.py`, and
+  `site/public/llms-full.txt` auto-merge; `README.md`, `ROADMAP.md`,
+  `site/index.html`, `site/public/llms.txt`, and `skills/chainq/SKILL.md`
+  conflict because both sides rewrote the same summary paragraphs (the branch
+  edits v0.15-era text; `main` is now v0.17.1). Resolution is Step 0 below.
+- **Upstream re-verified 2026-07-26**: `eth_chainId` on
+  `https://rpc.mainnet.chain.robinhood.com` returned `0x1237` (= 4663); the
+  Blockscout explorer returned HTTP 200. The network values in Step 2 are still
+  correct.
 
 ## Why this matters
 
@@ -70,10 +83,12 @@ with broad command coverage and no new dependency or protocol-specific code.
 - The live probe on 2026-07-10 returned `{"result":"0x1237"}` from the public
   RPC. The endpoint is rate-limited by design; chainq should still use it
   because zero-setup public endpoints are the registry convention.
-- Network counts and lists are duplicated in `README.md:113`,
-  `ROADMAP.md:9`, `skills/chainq/SKILL.md:3,53`, `site/index.html:38`, and
-  `site/public/llms.txt:3`. `site/public/llms-full.txt` is generated from the
-  skill by `site/scripts/gen-llms-full.mjs` during the site prebuild.
+- Network counts and lists are duplicated, at these current-`main` locations:
+  `README.md:154`, `ROADMAP.md:9`, `skills/chainq/SKILL.md:3` and
+  `skills/chainq/SKILL.md:83`, `site/index.html:38`, `site/public/llms.txt:3`.
+  `site/public/llms-full.txt:72` is generated from the skill by
+  `site/scripts/gen-llms-full.mjs` (wired as the `prebuild` script in
+  `site/package.json`) — never hand-edit it.
 - Conventions: mainnets only in `NETWORKS`; no code comments; tests use plain
   asserts; every user-visible addition updates README, skill, roadmap, and the
   landing-site text.
@@ -88,9 +103,11 @@ with broad command coverage and no new dependency or protocol-specific code.
 | Headless test diagnostic | `env -u NO_COLOR TERM=xterm uv run pytest -q` | all tests pass when the host exports `TERM=dumb` |
 | Site | `pnpm --dir site build` | exit 0; Vite build completes |
 
-The headless diagnostic is not a waiver for test failures. At planning time,
-the suite passed 61 tests with a normal terminal environment; `TERM=dumb`
-alone makes three pre-existing color assertions fail.
+The headless diagnostic is not a waiver for test failures. Baseline measured on
+`main` at `a18daab` on 2026-07-26: `uv run ruff check .` prints
+`All checks passed!` and `uv run pytest -q` reports `130 passed, 24 deselected`
+in a normal terminal environment. `TERM=dumb` alone makes three pre-existing
+color assertions fail.
 
 ## Scope
 
@@ -121,6 +138,32 @@ alone makes three pre-existing color assertions fail.
 - Do not commit, push, or open a PR without the owner's explicit instruction.
 
 ## Steps
+
+### Step 0: Replay the existing branch onto current `main` (do this first)
+
+An implementation already exists at `feat/robinhood-chain` (`b0a46f5`). Do NOT
+rebase or merge it wholesale — its doc edits are snapshots of v0.15-era text and
+merging them would revert v0.16/v0.17 documentation. Replay only the code:
+
+1. Start a fresh branch from current `main` (`feat/robinhood-chain-v2` if the old
+   branch name is taken).
+2. Cherry-pick only the two code hunks, either with
+   `git checkout feat/robinhood-chain -- chainq/networks.py tests/test_networks.py`
+   or by re-typing them from Step 2 below. Inspect the result with
+   `git diff --stat` — it must show exactly those two files.
+3. Take `tests/test_live.py` from `main` and add the one new entry by hand
+   (Step 3); do not take the branch's version of the file.
+4. Redo every documentation edit from scratch against current `main` text
+   (Step 4). The old branch's versions of `README.md`, `ROADMAP.md`,
+   `site/index.html`, `site/public/llms.txt`, and `skills/chainq/SKILL.md` are
+   stale — ignore them entirely.
+
+Then continue with Steps 1–4 as written; they are still accurate.
+
+**Verify**: `git diff --stat main..HEAD` lists only in-scope files, and no
+diff hunk reverts a v0.16/v0.17 documentation sentence (spot-check that
+`ROADMAP.md:9` still mentions buybacks and ETF flows, and that
+`skills/chainq/SKILL.md:3` still mentions Kamino).
 
 ### Step 1: Re-verify the official network values
 
@@ -223,8 +266,9 @@ site build exits 0.
 - [ ] Robinhood live smoke and all four manual commands exit 0.
 - [ ] README, skill, roadmap, site hero, and llms files say 26 EVM networks.
 - [ ] `pnpm --dir site build` exits 0.
-- [ ] `git status --short` shows only in-scope files plus the pre-existing
-  untracked `media/chainq-twitter.mp4`.
+- [ ] `git status --short` shows only in-scope files (the tree was clean at
+  `a18daab`; anything else is yours and must be explained).
+- [ ] No documentation hunk reverts v0.16/v0.17 text (Step 0 verification).
 - [ ] `plans/README.md` status row is updated.
 
 ## STOP conditions
