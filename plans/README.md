@@ -20,10 +20,12 @@ work on the named branch and report to the owner.
 | 008 | Add Kamino lending markets | P1 | M | — | DONE — merged via PR #4; re-verified live 2026-07-26 |
 | 001 | Accept SPL mints in `price`/`asset` | P1 | S | — | DONE — merged via PR #5; re-verified live 2026-07-26 |
 | 003 | `chainq yields` — cross-protocol yield comparison | P1 | M | 008 | DONE — merged via PR #3; re-verified live 2026-07-26 |
-| 004 | `chainq tx` decodes function + token transfers | P2 | M | — | DONE — reviewed and APPROVED 2026-07-26; opened as PR #6 from `feat/tx-decode`, awaiting the owner's merge |
+| 004 | `chainq tx` decodes function + token transfers | P2 | M | — | DONE — merged via PR #6 on 2026-07-27 (`ec93976`) |
 | 007 | Add Robinhood Chain mainnet | P1 | S | — | IN PROGRESS — branch `b0a46f5` is sound and upstream re-verified, but needs the Step 0 replay onto current `main` (docs conflict, code does not) |
 | 009 | Add read-only Pump/PumpSwap state | P1 | L | 001 (merged) | TODO — refreshed to `a18daab`, executable |
+| 010 | `chainq tx` names the action — swaps, approvals, lending, vaults, wraps | P1 | L | 004 (merged) | TODO — written 2026-07-28 at `ec93976`; every event signature verified live |
 | 005 | `uniswap quote` — amount-aware swap quotes | P2 | M | — | TODO — zero drift since it was written; directly executable |
+| 011 | `chainq tx` sees through bundlers and multisigs (ERC-4337, Safe) | P2 | M | **010** | TODO — blocked on 010; event layouts read out of real receipts |
 | 006 | Polymarket under `protocols` | P3 | M | — | TODO — refreshed to `a18daab`, executable |
 | 002 | `chainq read` — generic contract read | P1 | M | — | REJECTED — v0.16 independently shipped the capability as `chainq evm call` |
 
@@ -35,8 +37,9 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   `main`, not from `feat/solana-mints-price`.
 - 003 depended on 008; both are merged.
 - 007 must not be rebased or merged wholesale — see Step 0 in its plan.
-- 004 is complete but unmerged; it sits on `feat/tx-decode` on top of `a18daab`.
-  Nothing else depends on it.
+- 004 is merged; 010 builds directly on the `_decode_transfers` helper it added.
+- 011 depends on 010 for `chainq/decode.py` and its `(topic0, topic_count)`
+  registry key. Do not start 011 first — it has no decoder to extend.
 - Every plan updates `skills/chainq/SKILL.md`; when batching features, merge by
   section and regenerate `site/public/llms-full.txt` after the final skill edit
   (`pnpm --dir site build` runs `scripts/gen-llms-full.mjs` as `prebuild`).
@@ -110,6 +113,30 @@ from the previous status table.
   directory shows up as untracked whenever an executor runs. Worth adding to
   `.gitignore` so it can never be committed by accident.
 
+## Extension notes — 2026-07-28
+
+Plans 010 and 011 were written at `ec93976` (PR #6 merged) as the follow-up to
+004. Both were grounded live rather than from memory:
+
+- Every event signature in 010's registry table was confirmed by `eth_getLogs`
+  over Ethereum blocks 25627804–25627864, and the table records the observed
+  emitter and hit count per row. Four rare signatures (Aave `LiquidationCall`,
+  two Compound III events, Morpho Blue `Supply`) produced **zero hits** in the
+  window; the plan requires the executor to observe each live or drop it.
+- 011's `UserOperationEvent` and Safe `ExecutionSuccess` layouts were read word
+  by word out of real receipts, not inferred from an ABI. That is how the
+  decisive detail surfaced: `ExecutionSuccess` is emitted with **two different
+  topic layouts** by different Safe contract versions under one topic0, which is
+  why 010's registry is keyed by `(topic0, topic_count)` rather than topic0
+  alone. A topic0-only registry would mis-decode one of the two into confident
+  nonsense.
+- Two EntryPoint versions (v0.6 and v0.7) were both observed live emitting the
+  same `UserOperationEvent` topic0, so 011 detects account abstraction by the
+  event and reads the EntryPoint off the emitter — no address list to maintain.
+- The "before" output quoted in both plans' *Why this matters* sections is real
+  `chainq tx` output captured at `ec93976`, including the Uniswap v4 swap whose
+  ETH leg is invisible because v4 settles natively without a `Transfer` log.
+
 ## Findings considered and rejected
 
 - **Watch/stream mode + threshold alerts**: a daemon changes the tool's character and agents can loop the CLI themselves; stays on ROADMAP "Later". Not planned.
@@ -134,3 +161,31 @@ from the previous status table.
   RPC call per token in a command that must stay fast. `tx` degrades silently to
   short addresses and raw amounts instead. Deliberate divergence from that
   exemplar.
+- **Pricing swaps from pool internals** (raised while writing 010): decoding
+  `amount0`/`amount1` out of a `Swap` event needs the pool's `token0`/`token1`,
+  which is a second multicall round-trip *after* the first resolves — two extra
+  round-trips on a command that must stay fast. The same amounts are already
+  present in the `Transfer` logs of the same transaction, so 010 computes the
+  sender's net token flow from those instead, at zero extra RPC cost. Swap
+  events are registered for classification only.
+- **Full calldata argument decoding for `tx`**: `chainq evm abi-decode` and the
+  helpers in `chainq/evm.py` can decode arguments given a signature, and 4byte
+  supplies a candidate signature — but 4byte selector collisions are real and
+  plan 004's standing rule is that the function name is a label nothing may
+  branch on. Decoding arguments against a possibly-wrong signature produces
+  confidently wrong output, which is worse than none. Not planned; revisit only
+  behind a verified ABI source.
+- **Trace-based decoding (`debug_traceTransaction` / `trace_transaction`)**:
+  would expose internal calls and native transfers that logs miss (the Uniswap
+  v4 ETH leg in 010's example). Rejected because the public RPC pool in
+  `chainq/networks.py` does not offer debug namespaces — the feature would be
+  unavailable on most networks and would make `tx` behave differently depending
+  on which fallback endpoint answered.
+- **Rendering NFT transfers with token ids and collection names**: ERC-721/1155
+  rows are in 010's registry for classification, but rendering them well needs
+  per-collection metadata and a token-id display policy. Deliberately deferred
+  to its own plan rather than bolted onto the transfer list.
+- **Recursive decoding of inner UserOperation `callData` and Safe multisend
+  payloads**: a genuine nested call tree is a different output shape (a tree,
+  not a line list) and a materially larger surface. 011 surfaces inner effects
+  through the events and transfers they already emit; recursion is a follow-up.
