@@ -2,7 +2,15 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
-## Unreleased
+## v0.19.0
+
+### Features
+- add Robinhood Chain mainnet
+
+### Documentation
+- regenerate release references for v0.19.0
+
+## v0.18.0
 
 ### Features
 - decode ERC-20 transfers and called function in tx
@@ -12,6 +20,7 @@ Generated from conventional commits (`scripts/gen_changelog.py`).
 - make tx decode metadata and 4byte lookup fully best-effort
 
 ### Documentation
+- regenerate release references for v0.18.0
 - add tx decoding follow-up plans
 - reconcile implementation plans
 
