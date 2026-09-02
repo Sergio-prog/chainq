@@ -25,14 +25,7 @@
 - **Implementation**: branch `feat/robinhood-chain`, commit `b0a46f5` (one
   commit, based on `7b4fb6f`); lint, branch tests, and live gas verified
   2026-07-16
-- **Reconciliation status**: IN PROGRESS — code merges clean, docs do not.
-  Verified read-only on 2026-07-26 with
-  `git merge-tree --write-tree --name-only main feat/robinhood-chain`:
-  `chainq/networks.py`, `tests/test_networks.py`, `tests/test_live.py`, and
-  `site/public/llms-full.txt` auto-merge; `README.md`, `ROADMAP.md`,
-  `site/index.html`, `site/public/llms.txt`, and `skills/chainq/SKILL.md`
-  conflict because both sides rewrote the same summary paragraphs (the branch
-  edits v0.15-era text; `main` is now v0.17.1). Resolution is Step 0 below.
+- **Reconciliation status**: DONE — PR #2 merged `main` back in on 2026-09-03; conflicted docs were resolved from current `main` text and the network entry gained a publicnode fallback RPC.
 - **Upstream re-verified 2026-07-26**: `eth_chainId` on
   `https://rpc.mainnet.chain.robinhood.com` returned `0x1237` (= 4663); the
   Blockscout explorer returned HTTP 200. The network values in Step 2 are still

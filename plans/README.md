@@ -21,7 +21,7 @@ work on the named branch and report to the owner.
 | 001 | Accept SPL mints in `price`/`asset` | P1 | S | — | DONE — merged via PR #5; re-verified live 2026-07-26 |
 | 003 | `chainq yields` — cross-protocol yield comparison | P1 | M | 008 | DONE — merged via PR #3; re-verified live 2026-07-26 |
 | 004 | `chainq tx` decodes function + token transfers | P2 | M | — | DONE — merged via PR #6 on 2026-07-27 (`ec93976`) |
-| 007 | Add Robinhood Chain mainnet | P1 | S | — | IN PROGRESS — branch `b0a46f5` is sound and upstream re-verified, but needs the Step 0 replay onto current `main` (docs conflict, code does not) |
+| 007 | Add Robinhood Chain mainnet | P1 | S | — | DONE — PR #2 replayed onto current `main` (merge + doc redo, publicnode fallback RPC); lint, tests, and live gas/balance/portfolio verified 2026-09-03 |
 | 009 | Add read-only Pump/PumpSwap state | P1 | L | 001 (merged) | TODO — refreshed to `a18daab`, executable |
 | 010 | `chainq tx` names the action — swaps, approvals, lending, vaults, wraps | P1 | L | 004 (merged) | TODO — written 2026-07-28 at `ec93976`; every event signature verified live |
 | 005 | `uniswap quote` — amount-aware swap quotes | P2 | M | — | TODO — zero drift since it was written; directly executable |
