@@ -33,6 +33,10 @@ def dim(text: str) -> str:
     return paint(text, DIM)
 
 
+def green(text: str) -> str:
+    return paint(text, GREEN)
+
+
 def fmt_amount(value: object) -> str:
     d = Decimal(str(value))
     if d == 0:

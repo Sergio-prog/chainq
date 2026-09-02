@@ -107,3 +107,28 @@ def spot_markets() -> list[dict]:
 def spot_balances(address: str) -> list[dict]:
     state = info({"type": "spotClearinghouseState", "user": address})
     return state.get("balances") or []
+
+
+ASSISTANCE_FUND = "0xfefefefefefefefefefefefefefefefefefefefe"
+HYPE_SPOT_COIN = "@107"
+_FILLS_PAGE_CAP = 2000
+
+
+def user_fills_by_time(address: str, start_ms: int, end_ms: int) -> list[dict]:
+    fills: list[dict] = []
+    seen: set[int] = set()
+    cursor = start_ms
+    while True:
+        page = info({"type": "userFillsByTime", "user": address, "startTime": cursor, "endTime": end_ms})
+        if not page:
+            break
+        for fill in page:
+            tid = fill.get("tid")
+            if tid in seen:
+                continue
+            seen.add(tid)
+            fills.append(fill)
+        if len(page) < _FILLS_PAGE_CAP:
+            break
+        cursor = page[-1]["time"] + 1
+    return fills

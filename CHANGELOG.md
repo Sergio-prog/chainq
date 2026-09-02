@@ -2,6 +2,51 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## Unreleased
+
+### Features
+- decode ERC-20 transfers and called function in tx
+- token buybacks, ETF flows, and configurable asset links
+
+### Fixes
+- make tx decode metadata and 4byte lookup fully best-effort
+
+### Documentation
+- add tx decoding follow-up plans
+- reconcile implementation plans
+
+## v0.17.1
+
+### Features
+- colorize yields output
+- align yields text output
+- refine yields and update workflows
+
+### Documentation
+- regenerate changelog for v0.17.1
+
+## v0.17.0
+
+### Features
+- add cross-protocol yields command
+- add Kamino lending markets
+- support Solana mints in market commands
+
+### Documentation
+- regenerate release references for v0.17.0
+- mark completed plans merged
+- reconcile implementation plans
+- regenerate changelog for v0.16.0
+
+## v0.16.0
+
+### Features
+- add EVM query and utility commands
+
+### Documentation
+- add Robinhood Kamino and Pump plans
+- regenerate changelog for v0.15.1
+
 ## v0.15.1
 
 ### Fixes

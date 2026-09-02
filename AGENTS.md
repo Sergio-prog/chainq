@@ -15,6 +15,7 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 ## Output contract (do not break)
 
 - Every query command supports `--json`, `-q`, `-v`, and `--format text|json|table|toon`; default text is one human-readable line per result.
+- Make default human-facing text visually structured and colorized: align repeated columns, dim labels and metadata, emphasize primary values, and use semantic green/red where meaningful. Preserve plain output for pipes and honor `--no-color`, `NO_COLOR`, and `TERM=dumb`.
 - Errors go to stderr with exit code 1; stdout stays clean for parsing.
 - A new command ships with: the contract flags above, an entry in `skills/chainq/SKILL.md`, and a README example.
 

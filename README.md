@@ -4,7 +4,7 @@
 
 [chainq.serhiifotex.dev](https://chainq.serhiifotex.dev/)
 
-Query asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols (Aave, Uniswap, Curve, Morpho, Pendle...), and Hyperliquid perps from a single tool. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
+Query and transform Web3 data from one predictable CLI: asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols, perps, and EVM utilities. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
 
 ```console
 $ chainq price eth btc hype
@@ -74,7 +74,7 @@ git clone https://github.com/Sergio-prog/chainq && cd chainq
 uv tool install .
 ```
 
-The install scripts bootstrap uv if it's missing (whether or not Python is already installed — uv provisions Python 3.12+ as needed). Update any time with `chainq update` — chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
+The install scripts bootstrap uv if it's missing (whether or not Python is already installed — uv provisions Python 3.12+ as needed). Update any time with `chainq update`; package-manager output stays hidden unless you pass `-v`, and Homebrew updates run without a confirmation prompt. chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
 
 ## Commands
 
@@ -83,13 +83,35 @@ The install scripts bootstrap uv if it's missing (whether or not Python is alrea
 ```bash
 chainq price eth btc sol         # spot price, 24h change, market cap
 chainq price 0xTokenAddress      # any token by contract address (DexScreener fallback for long-tail)
+chainq price <SPL mint>          # Solana mint address
 chainq price btc --at 2025-03-01 # historical price on a date (last 365 days)
 chainq candles btc --days 30     # OHLC candles; granularity auto-scales with the window
 chainq trending                  # trending assets right now
 chainq stables --min-mcap 1e9    # stablecoins by mcap: peg price, supply changes, mechanism
+chainq yields --asset usdc       # cross-protocol yields sorted by TVL; $1M minimum by default
+chainq yields -s apy --min-tvl 0 # sort by APY and include opportunities with any reported TVL
 chainq asset ethena              # full profile: price, mcap/FDV, supply, ATH, links
+chainq asset btc --links tradingview,binance,coingecko  # add chart/exchange links (default: TradingView)
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
+
+The default yields text output aligns APY, type, market, network, and TVL into readable terminal columns. Interactive terminals color APY green, dim metadata, and emphasize TVL; piped output stays plain. Use `--format table` for field headers or `--json` for structured data.
+
+`chainq asset` appends an asset link line (TradingView by default). Choose providers with `--links tradingview,binance,coingecko`, or set a persistent default with `chainq config set asset-links binance,coingecko` (or the `CHAINQ_ASSET_LINKS` env var).
+
+### Buybacks & ETF flows
+
+```bash
+chainq buybacks hype -d 30       # last 30 days of Assistance Fund spot buys (daily)
+chainq buybacks sky              # SKY bought by the Sky Smart Burn Engine, per UTC day
+chainq buybacks uni -d 14        # UNI burned by the onchain Firepit Released events, per day
+chainq buybacks hype sky uni     # several programs in one call, each at its own cadence
+chainq buybacks zro --format table  # LayerZero monthly rows with source + provenance
+chainq etf btc -d 7              # daily US spot Bitcoin ETF net flows, per issuer + total (The Block)
+chainq etf eth --json           # Ethereum ETF flows as structured JSON
+```
+
+`buybacks` takes one or more programs — **hype, sky, uni, zro** (plus `lit`, see below) — and never guesses a default set, so you only pay for the sources you ask for. Each program is reported at its actual cadence and carries its `source`, `source_url`, and `provenance` (`live` or `snapshot`) on every row; the text view aligns period/amount/cost/avg into a table with a totals row, and drops columns a program doesn't report. HYPE is live (Hyperliquid Assistance Fund spot fills, daily); SKY is live onchain (Smart Burn Engine `Exec` events — `MCD_FLAP` resolved from the Sky chainlog — ~every 4h, bucketed per day); UNI is live onchain (Firepit `Released` burn events, per day); ZRO is parsed live from the LayerZero foundation tracker (monthly) and falls back to a clearly-labeled retained snapshot if the page is unreachable. LIT is intentionally not synthesized: the Lighter treasury buys LIT via daily TWAP, but that account's fills are auth-gated, so `chainq buybacks lit` reports the exact data limitation instead of inventing numbers. `etf` pulls daily net flows from The Block's public data API (no key required) with source attribution.
 
 ### Onchain (EVM + Solana)
 
@@ -105,12 +127,31 @@ chainq portfolio 0x... --defi --hide-unpriced         # fold in Hyperliquid perp
 chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
 chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
-chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block
+chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block, decoded ERC-20 transfers + called function
 chainq tx 5Ufd... -n solana                           # Solana signature lookup
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch (getSlot on solana)
 ```
 
-26 EVM networks: **ethereum, arbitrum, robinhood, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana** — plus **solana** — by key, alias (`eth`, `arb`, `rh`, `op`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
+### EVM queries and utilities
+
+`chainq evm` exposes common EVM primitives for agent workflows. Run `chainq evm --help` for the complete command catalog instead of loading it into agent context up front.
+
+```bash
+chainq evm block-number -n base                       # latest block
+chainq evm find-block 2026-07-01T12:00:00Z            # block closest to a timestamp
+chainq evm code 0xContract -n base                    # contract bytecode
+chainq evm storage 0xContract 0 -n base               # storage word at a slot
+chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256
+chainq evm estimate 0xToken 'transfer(address,uint256)' '["0xTo",1]'
+chainq evm sig 'transfer(address,uint256)'             # 0xa9059cbb
+chainq evm abi-encode 'address,uint256' '["0xTo",1]'
+chainq evm keccak 'hello'                              # Keccak-256 of UTF-8 text
+chainq evm to-wei 1.5 ether                            # 1500000000000000000
+```
+
+Every subcommand supports `--json`, `-q`, `-v`, and `--format`. Existing `chainq balance`, `chainq gas`, `chainq tx`, and `chainq rpc` remain the canonical cross-chain commands.
+
+26 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 
 ### Protocols
 
@@ -120,6 +161,14 @@ Aave v3:
 chainq protocols aave markets -n ethereum         # reserves: supply/borrow APY, size, utilization
 chainq protocols aave markets -c usdc -n base     # one asset across markets
 chainq protocols aave markets -s borrow-apy       # sort: supplied | supply-apy | borrow-apy | utilization
+```
+
+Kamino lending on Solana:
+
+```bash
+chainq protocols kamino markets                   # reserves: supply/borrow APY, supplied USD, utilization
+chainq protocols kamino markets -c usdc           # exact symbol or mint filter across discovered markets
+chainq protocols kamino markets -s supply-apy     # sort: supplied | supply-apy | borrow-apy | utilization
 ```
 
 Uniswap, Curve, and Pendle:
@@ -207,6 +256,7 @@ Values live in `~/.config/chainq/.env`; plain env vars and a `.env` in cwd work 
 | `CHAINQ_HTTP_TIMEOUT` / `CHAINQ_RPC_TIMEOUT` | timeouts in seconds |
 | `CHAINQ_NO_UPDATE_CHECK` | disable the daily update check |
 | `OPENSEA_API_KEY` | unlocks `nft top` and long-tail collection slugs |
+| `CHAINQ_ASSET_LINKS` | default `asset` link providers (e.g. `tradingview,binance,coingecko`) |
 
 ## For AI agents
 

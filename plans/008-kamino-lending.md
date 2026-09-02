@@ -19,6 +19,10 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `7b4fb6f`, 2026-07-10
+- **Implemented**: branch `feat/kamino-markets`, commit `69dd211`; reviewed,
+  verified, and merged via PR #4
+- **Re-verified on `main` at `a18daab`, 2026-07-26**: `chainq protocols kamino`
+  exposes the `markets` subcommand and exits 0; `tests/test_kamino.py` passes
 
 ## Why this matters
 

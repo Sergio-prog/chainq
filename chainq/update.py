@@ -103,13 +103,30 @@ def _upgrade_command() -> list[str]:
     if "pipx" in prefix and shutil.which("pipx"):
         return ["pipx", "upgrade", "chainq"]
     if "/Cellar/" in prefix and shutil.which("brew"):
-        return ["brew", "upgrade", "chainq"]
+        return ["brew", "upgrade", "--no-ask", "chainq"]
     raise ChainqError(
         "could not detect how chainq was installed; reinstall with the install script or `uv tool install chainq`"
     )
 
 
-def update(force: Annotated[bool, typer.Option("--force", help="reinstall even if already up to date")] = False):
+def _run_upgrade(cmd: list[str], verbose: bool) -> subprocess.CompletedProcess:
+    if verbose:
+        print(f"running: {' '.join(cmd)}")
+        return subprocess.run(cmd)
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def _upgrade_error(result: subprocess.CompletedProcess) -> str:
+    output = (result.stderr or result.stdout or "").strip()
+    if output:
+        return f"upgrade command failed: {output.splitlines()[-1]}"
+    return "upgrade command failed; rerun with `chainq update -v` for details"
+
+
+def update(
+    force: Annotated[bool, typer.Option("--force", help="reinstall even if already up to date")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="show package manager output")] = False,
+):
     """Self-update chainq to the latest version."""
     latest = fetch_latest_version()
     if latest:
@@ -121,11 +138,19 @@ def update(force: Annotated[bool, typer.Option("--force", help="reinstall even i
     if force and cmd[:3] == ["uv", "tool", "upgrade"]:
         cmd = ["uv", "tool", "upgrade", "--reinstall", "chainq"]
     if force and cmd[:2] == ["brew", "upgrade"]:
-        cmd = ["brew", "reinstall", "chainq"]
-    print(f"running: {' '.join(cmd)}")
-    result = subprocess.run(cmd)
+        cmd = ["brew", "reinstall", "--no-ask", "chainq"]
+    if not verbose:
+        print("Updating chainq...", end="", flush=True)
+    result = _run_upgrade(cmd, verbose)
     if result.returncode != 0:
-        raise ChainqError("upgrade command failed")
+        if not verbose:
+            print(" failed")
+        raise ChainqError(_upgrade_error(result))
+    target = latest or "latest"
+    if verbose:
+        print(f"chainq updated to {target}")
+    else:
+        print(f" done ({target})")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,8 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `4b48de2`, 2026-07-07
+- **Disposition**: REJECTED on 2026-07-16; v0.16 independently shipped the
+  capability as `chainq evm call`, backed by shared calldata and ABI helpers
 
 ## Why this matters
 

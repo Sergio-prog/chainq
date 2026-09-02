@@ -6,7 +6,7 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `plans/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 4b48de2..HEAD -- chainq/commands/chain.py chainq/providers/ chainq/tokens.py`
+> **Drift check (run first)**: `git diff --stat d3e341e..HEAD -- chainq/commands/chain.py chainq/providers/ chainq/tokens.py`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -18,7 +18,16 @@
 - **Risk**: MED (touches an existing core command; must not break its current output contract)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `4b48de2`, 2026-07-07
+- **Planned at**: commit `d3e341e`, 2026-07-16 (reconciled; finding still present)
+- **Implemented**: branch `feat/tx-decode`, commits `1ee0671` + `e08d800`, based
+  on `main` at `a18daab`. Executed by a subagent in an isolated worktree and
+  reviewed over two rounds on 2026-07-26; **APPROVED and opened as PR #6**
+  (<https://github.com/Sergio-prog/chainq/pull/6>) — the merge decision is the
+  owner's. Round 1 was returned for two defects (unguarded
+  metadata `multicall` could abort the whole `tx` command; `fourbyte.signature`
+  could raise on a malformed payload); both fixed in round 2. Final state: ruff
+  clean, 140 passed / 24 deselected, scope limited to the 5 in-scope files, and
+  a confirmed plain ETH send produces byte-identical output to `main`.
 
 ## Why this matters
 
@@ -26,7 +35,7 @@ Most DeFi transactions carry `value: 0`, so today's `chainq tx` output for a swa
 
 ## Current state
 
-- `chainq/commands/chain.py:270-345` — the `tx` command (EVM path). Facts that matter:
+- `chainq/commands/chain.py:268-345` — the `tx` command (EVM path). Facts that matter:
   - `receipt = client.w3.eth.get_transaction_receipt(tx_hash)` is already fetched (chain.py:~291); `receipt["logs"]` is available and unused.
   - `transaction["input"]` (calldata) is available and unused.
   - Output today: status, from → to, native value + USD, fee + USD, block/time, explorer link. `data` dict keys at chain.py:308-325; text `lines` at chain.py:326-337.
@@ -135,10 +144,13 @@ Stop and report back if:
 
 - 4byte.directory's response shape differs from Step 1's description (verify live first — if the API is gone or now requires a key, report; do not swap in a different service unilaterally).
 - `receipt["logs"]` from web3 doesn't expose `topics`/`data` as bytes in the pinned web3 version — report the actual types before adapting.
-- The `tx` function has drifted from the excerpt locations (chain.py:270-345).
+- The `tx` function has drifted materially from the reconciled excerpt at
+  `chain.py:268-345`.
 
 ## Maintenance notes
 
 - Selector collisions are real: the function line is best-effort labeling, never load-bearing — reviewers should reject any future logic that *branches* on the 4byte name.
+- Known follow-up (as-implemented, plan-compliant): the function name is gated behind `receipt is not None` alongside the transfer decoding, so a *pending* tx shows no `calls …` line even though the selector comes from `transaction["input"]` and needs no receipt. This matches this plan's literal "pending txs skip both enrichments" instruction; if pending-tx labeling is later wanted, split the two conditions.
+- Any enrichment added to `tx` must degrade silently rather than raise — `tx` is a core command and its baseline output (status/parties/value/fee/block) must survive a failing decoder, price lookup, or metadata call.
 - Adding ERC-721/1155 support later = relax the 3-topic filter + tokenId decoding; the cap and multicall metadata batch already generalize.
 - If a `chainq read`-style ABI layer lands (plans/002), revisit argument decoding for the top ~20 selectors.
