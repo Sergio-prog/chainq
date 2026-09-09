@@ -68,6 +68,7 @@ CHAIN_SLUGS = {
     "hyperevm": "hyperevm",
     "plasma": "plasma",
     "katana": "katana",
+    "robinhood": "robinhood",
 }
 
 V2_FACTORY_ABI = [
