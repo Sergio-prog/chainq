@@ -84,12 +84,16 @@ chainq etf eth --json              # ETH ETF flows as structured JSON
 
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
-chainq portfolio vitalik.eth                                  # sweep ALL networks: native + known tokens, USD total
-chainq portfolio 0x... -n ethereum -n base --min-usd 1        # restrict networks, hide dust below $1
-chainq portfolio 0x... --hide-unpriced                        # also drop tokens with no known USD price
+chainq portfolio vitalik.eth                                  # sweep ALL networks: native + every catalog token, USD total
+chainq portfolio 0x... -n ethereum -n base --min-usd 10       # restrict networks, raise the dust floor (default $1)
+chainq portfolio 0x... --all                                  # also show unpriced tokens and dust (hidden by default)
 chainq portfolio 0x... --defi                                 # fold in Hyperliquid perp equity + spot balances
-chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol
+chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol (curated, then the catalog)
+chainq balance 0x... --coin basecat -n base                   # any catalog symbol works; ambiguous symbols error with candidates
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
+chainq tokens search cat -n base                              # find symbols/addresses in the catalog (exact + curated first)
+chainq tokens status                                          # catalog size, sources, cache age per network
+chainq tokens refresh -n base                                 # re-download the lists now (they refresh daily otherwise)
 chainq address 0xADDR -n base                                 # what IS this: EOA vs contract, proxy impl, holdings
 chainq gas -n base                                            # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                                  # status, parties, value, fee, block, decoded ERC-20 transfers + called function
@@ -107,7 +111,9 @@ chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256 -n
 chainq evm abi-decode 'address,uint256' 0x...
 ```
 
-Known token symbols per network are listed in the `balance` error message if a symbol misses; any ERC-20 works by address. Balances include a best-effort USD value. Registry-token reads are batched via Multicall3, so `portfolio` is one RPC call per network.
+Token symbols resolve against a small curated registry first (so `usdc` is always the canonical USDC), then the token catalog: CoinGecko's per-network token lists plus Aave aTokens/stata tokens, Pendle PT/YT/SY/LP, and Jupiter's verified Solana mints, cached daily under `~/.cache/chainq/blobs/`. A symbol with several catalog matches errors and lists the candidates; pass the address instead (`chainq tokens search` finds it). Any ERC-20 works by address.
+
+`portfolio` and `address` sweep the whole catalog (thousands of tokens per network) with chunked Multicall3 `balanceOf` calls, so nothing outside the curated list is missed. Spam stays out by construction: only catalog tokens are swept, prices come from CoinGecko, DefiLlama, Jupiter, or Pendle (DexScreener as a last resort, with a $1k liquidity floor), and anything unpriced or below `--min-usd` (default $1) is hidden and counted; `--all` reveals it. Each asset carries `price_source` and `kind` (`token`, `atoken`, `stata`, `pt`, `yt`, `sy`, `lp`) in `--json`. If the lists cannot be downloaded, everything degrades to the curated registry.
 
 ### Solana
 
@@ -116,9 +122,9 @@ Base58 addresses, `.sol` domains (SNS), and base58 tx signatures route to Solana
 ```bash
 chainq balance toly.sol                                       # .sol domains resolve everywhere an address is accepted
 chainq balance 9WzDX... -n solana                             # SOL balance
-chainq balance 9WzDX... -n sol --coin usdc                    # SPL token by symbol (usdc, usdt, jup, bonk, wif, msol, jitosol) or mint
-chainq portfolio 9WzDX...                                     # SOL + EVERY SPL token account (one RPC call); unknown mints show unpriced
-chainq portfolio 9WzDX... --hide-unpriced                     # recommended for busy wallets: drops spam mints
+chainq balance 9WzDX... -n sol --coin usdc                    # SPL token by symbol (curated, then Jupiter verified / CoinGecko) or mint
+chainq portfolio 9WzDX...                                     # SOL + every catalog mint with a Jupiter price; unknown/unpriced mints hidden
+chainq portfolio 9WzDX... --all                               # show unknown mints too (as short addresses, unpriced)
 chainq address 9WzDX...                                       # wallet vs program, owner program, token account count
 chainq tx 5UfDuX94A1Qfq... -n solana                          # by signature: status, signer, fee, slot
 chainq gas -n solana                                          # base fee + median priority fee, transfer cost USD
@@ -127,7 +133,7 @@ chainq rpc getSlot -n solana                                  # raw Solana JSON-
 
 ## Address intelligence
 
-`chainq address <addr>` answers "what is this address?" on any network: EOA vs contract (with EIP-7702 delegation detection), proxy resolution (EIP-1967/1167/ZeppelinOS → implementation address), ERC-20 token profile (name, symbol, decimals, supply), tx count, native + registry token holdings with USD values, reverse ENS on ethereum, explorer link. On Solana: wallet vs program, owner program, SOL balance, token accounts. Use it before interacting with an unknown address, or to check whether a token contract is a proxy.
+`chainq address <addr>` answers "what is this address?" on any network: EOA vs contract (with EIP-7702 delegation detection), proxy resolution (EIP-1967/1167/ZeppelinOS → implementation address), ERC-20 token profile (name, symbol, decimals, supply), tx count, native + catalog token holdings with USD values (unpriced holdings counted in `holdings_hidden`), reverse ENS on ethereum, explorer link. On Solana: wallet vs program, owner program, SOL balance, token accounts. Use it before interacting with an unknown address, or to check whether a token contract is a proxy.
 
 ## Aave v3 (lending)
 
@@ -254,7 +260,8 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 
 ## Recipes
 
-- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + registry tokens, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Use `balance` only for a single token/network, or for tokens outside the registry (by contract address).
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + every catalog token, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Use `balance` for a single token/network.
+- "Unknown token 'X'" / "which address is X?" — `tokens search X -n <network>`; if several tokens share the symbol, pick the address and pass it to `balance --coin`.
 - "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
 - "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.

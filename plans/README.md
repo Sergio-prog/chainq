@@ -28,6 +28,7 @@ work on the named branch and report to the owner.
 | 011 | `chainq tx` sees through bundlers and multisigs (ERC-4337, Safe) | P2 | M | 010 (done, unmerged) | TODO — unblocked; base it on `feat/tx-event-decoding`, not `main`, until 010 merges |
 | 006 | Polymarket under `protocols` | P3 | M | — | TODO — refreshed to `a18daab`, executable |
 | 002 | `chainq read` — generic contract read | P1 | M | — | REJECTED — v0.16 independently shipped the capability as `chainq evm call` |
+| 012 | Token catalog — auto token lists, catalog-wide sweeps, spam-free portfolios | P1 | L | — | DONE — built 2026-09-09 on `feat/token-catalog` from `0b8ccc3`; every source and slug verified live; unmerged — the merge is the owner's call |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -177,6 +178,9 @@ Executed by a subagent in an isolated worktree; reviewed over two rounds.
 
 ## Findings considered and rejected
 
+- **Explorer-based token discovery for `portfolio`** (Blockscout `/addresses/{addr}/tokens`, considered while planning 012): finds every token a wallet ever received, which is exactly the ~80 airdrop scam tokens per active wallet that downstream products then had to filter out, and the public instances answered 403 and 503 during planning. The catalog approach (CoinGecko per-network lists + protocol feeds) reaches the same mid-cap depth — vitalik.eth holds 210 listed tokens on Base alone — without the spam. Not planned; noted in ROADMAP "Later" behind a hypothetical `--discover`.
+- **Static community token lists** (Uniswap, Raydium, PancakeSwap): archived, miss everything launched in the last two years. Rejected in favour of `tokens.coingecko.com/{platform}/all.json`, which is regenerated daily for all 26 EVM networks and Solana.
+- **DefiLlama for Solana prices**: returns `0.0` for sub-cent mints (BONK). Jupiter `price/v3` is used instead, with its `liquidity` field as the spam floor.
 - **Watch/stream mode + threshold alerts**: a daemon changes the tool's character and agents can loop the CLI themselves; stays on ROADMAP "Later". Not planned.
 - **MCP wrapper**: deliberately parked pending demand from non-shell agents (ROADMAP "Later"); the skill-first thesis is working. Not planned.
 - **CEX prices via ccxt**: heavy dependency for a cross-check CoinGecko mostly covers. Not planned.

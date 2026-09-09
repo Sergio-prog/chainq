@@ -35,6 +35,10 @@ SMOKE = {
     "solana-gas": ["gas", "-n", "solana"],
     "solana-balance": ["balance", "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "-n", "solana"],
     "address-eoa": ["address", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"],
+    "catalog-portfolio-base": ["portfolio", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "-n", "base"],
+    "catalog-balance-symbol": ["balance", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "-c", "basecat", "-n", "base"],
+    "catalog-search": ["tokens", "search", "basecat", "-n", "base"],
+    "catalog-status": ["tokens", "status", "-n", "base"],
 }
 
 
@@ -44,3 +48,14 @@ def test_command_returns_json(args):
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert "error" not in payload
+
+
+def test_catalog_portfolio_hides_unpriced_by_default():
+    address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+    default = json.loads(runner.invoke(app, ["portfolio", address, "-n", "base", "--json"]).output)
+    everything = json.loads(runner.invoke(app, ["portfolio", address, "-n", "base", "--all", "--json"]).output)
+    assert len(default["assets"]) >= 20
+    assert all(a["price_usd"] is not None for a in default["assets"])
+    assert everything["hidden_assets"] == 0
+    assert len(everything["assets"]) > len(default["assets"])
+    assert any(a["source"] == "coingecko" and a["price_source"] == "defillama" for a in default["assets"])

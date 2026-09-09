@@ -53,6 +53,21 @@ CHAIN_SLUGS = {
     "avalanche": "avalanche",
     "gnosis": "gnosischain",
     "unichain": "unichain",
+    "linea": "linea",
+    "scroll": "scroll",
+    "zksync": "zksync",
+    "mantle": "mantle",
+    "blast": "blast",
+    "sonic": "sonic",
+    "berachain": "berachain",
+    "worldchain": "worldchain",
+    "ink": "ink",
+    "soneium": "soneium",
+    "celo": "celo",
+    "sei": "seiv2",
+    "hyperevm": "hyperevm",
+    "plasma": "plasma",
+    "katana": "katana",
 }
 
 V2_FACTORY_ABI = [

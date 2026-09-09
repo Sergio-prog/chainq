@@ -6,6 +6,8 @@ from chainq.errors import ChainqError
 
 SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
 TOKEN_URL = "https://api.dexscreener.com/latest/dex/tokens"
+TOKENS_BATCH_URL = "https://api.dexscreener.com/tokens/v1"
+TOKENS_BATCH = 30
 LLAMA_TVL_URL = "https://api.llama.fi/tvl/uniswap"
 LLAMA_SUMMARY_URL = "https://api.llama.fi/summary/dexs/uniswap"
 
@@ -44,6 +46,19 @@ def _pair_row(pair: dict) -> dict:
 
 def token_pairs(address: str) -> list[dict]:
     return _get(f"{TOKEN_URL}/{address}").get("pairs") or []
+
+
+def token_pairs_batch(chain_slug: str, addresses: list[str]) -> list[dict]:
+    pairs: list[dict] = []
+    unique = sorted(set(addresses))
+    for start in range(0, len(unique), TOKENS_BATCH):
+        batch = unique[start : start + TOKENS_BATCH]
+        try:
+            result = _get(f"{TOKENS_BATCH_URL}/{chain_slug}/{','.join(batch)}")
+        except ChainqError:
+            continue
+        pairs.extend(result if isinstance(result, list) else [])
+    return pairs
 
 
 def search_pairs(query: str) -> list[dict]:

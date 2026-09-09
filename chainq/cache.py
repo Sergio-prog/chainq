@@ -40,3 +40,47 @@ def put(key: str, value: object, ttl: float) -> None:
         _store(data)
     except OSError:
         pass
+
+
+BLOB_DIR = CACHE_DIR / "blobs"
+
+
+def _blob_path(name: str) -> Path:
+    return BLOB_DIR / f"{name}.json"
+
+
+def get_blob(name: str, max_age: float | None = None) -> object | None:
+    try:
+        entry = json.loads(_blob_path(name).read_text())
+        fetched_at = float(entry["fetched_at"])
+        value = entry["value"]
+    except Exception:
+        return None
+    if max_age is not None and time.time() - fetched_at > max_age:
+        return None
+    return value
+
+
+def blob_age(name: str) -> float | None:
+    try:
+        return time.time() - float(json.loads(_blob_path(name).read_text())["fetched_at"])
+    except Exception:
+        return None
+
+
+def put_blob(name: str, value: object) -> None:
+    try:
+        BLOB_DIR.mkdir(parents=True, exist_ok=True)
+        path = _blob_path(name)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"fetched_at": time.time(), "value": value}, default=str))
+        tmp.replace(path)
+    except OSError:
+        pass
+
+
+def drop_blob(name: str) -> None:
+    try:
+        _blob_path(name).unlink()
+    except OSError:
+        pass

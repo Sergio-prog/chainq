@@ -120,10 +120,12 @@ chainq networks                                       # supported networks and a
 chainq balance vitalik.eth                            # native balance, ENS supported
 chainq balance toly.sol                               # .sol domains too (SNS), auto-routed to Solana
 chainq balance 0x... --coin usdt -n arbitrum          # ERC-20 by symbol or contract address
+chainq balance 0x... --coin basecat -n base           # any symbol in the token catalog (CoinGecko lists + Aave/Pendle/Jupiter)
 chainq balance 9WzDX... -n solana --coin usdc         # SOL and SPL token balances
-chainq portfolio vitalik.eth                          # all networks: native + known tokens, USD total
-chainq portfolio 9WzDX...                             # Solana wallets: SOL + every SPL token account
-chainq portfolio 0x... --defi --hide-unpriced         # fold in Hyperliquid perp+spot; drop dust/unpriced
+chainq portfolio vitalik.eth                          # all networks: native + every catalog token, USD total, spam hidden
+chainq portfolio 9WzDX...                             # Solana wallets: SOL + every priced catalog mint
+chainq portfolio 0x... --defi --all                   # fold in Hyperliquid perp+spot; show dust and unpriced too
+chainq tokens search cat -n base                      # find tokens by symbol/name; status/refresh manage the daily cache
 chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
 chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD

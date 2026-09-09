@@ -84,6 +84,7 @@ PLATFORM_IDS = {
     "monad": "monad",
     "plasma": "plasma",
     "katana": "katana",
+    "robinhood": "robinhood",
     "solana": "solana",
 }
 

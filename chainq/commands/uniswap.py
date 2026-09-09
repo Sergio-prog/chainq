@@ -4,6 +4,7 @@ import typer
 from eth_abi import encode
 from web3 import Web3
 
+from chainq import catalog
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
 from chainq.networks import resolve_network
@@ -64,7 +65,8 @@ def pools(
     if base.startswith("0x") and len(base) == 42:
         address = base
     else:
-        address = TOKENS.get(net.key, {}).get(base.lower())
+        matches = catalog.resolve_symbol(net.key, base)
+        address = matches[0].address if len(matches) == 1 else None
     pairs = uniswap.token_pairs(address) if address else uniswap.search_pairs(query)
     rows = sorted(uniswap.uniswap_rows(pairs, chain_slug, quote), key=SORT_KEYS[sort], reverse=True)[:limit]
     if not rows:
@@ -88,10 +90,7 @@ def _resolve_pool_token(value: str, net, native_ok: bool) -> str:
         return weth
     if value.startswith("0x") and len(value) == 42:
         return value
-    address = TOKENS.get(net.key, {}).get(v)
-    if address is None:
-        raise ChainqError(f"unknown token '{value}' on {net.name}; pass the contract address")
-    return address
+    return catalog.resolve_one(net.key, v).address
 
 
 def _token_infos(client, net, addresses: list[str], memo: dict) -> None:

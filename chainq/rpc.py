@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 
+from chainq.catalog import CatalogToken
 from chainq.config import settings
 from chainq.errors import ChainqError
 from chainq.networks import NETWORKS, Network
@@ -117,14 +118,64 @@ def decode_string(data: bytes) -> str:
         return data[:32].rstrip(b"\x00").decode("utf-8", errors="replace")
 
 
-def multicall(client: "ChainClient", calls: list[tuple[str, bytes]]) -> list[bytes | None]:
+MULTICALL_CHUNK = 1000
+MULTICALL_MIN_CHUNK = 100
+
+
+AGGREGATE3_SELECTOR = Web3.keccak(text="aggregate3((address,bool,bytes)[])")[:4]
+
+
+def _word(value: int) -> bytes:
+    return value.to_bytes(32, "big")
+
+
+def _encode_aggregate3(calls: list[tuple[str, bytes]]) -> bytes:
+    tuples = []
+    for target, calldata in calls:
+        padded = calldata + b"\x00" * (-len(calldata) % 32)
+        tuples.append(
+            _word(int(target, 16)) + _word(1) + _word(0x60) + _word(len(calldata)) + padded
+        )
+    offsets = []
+    position = 32 * len(tuples)
+    for item in tuples:
+        offsets.append(_word(position))
+        position += len(item)
+    return AGGREGATE3_SELECTOR + _word(0x20) + _word(len(tuples)) + b"".join(offsets) + b"".join(tuples)
+
+
+def _decode_aggregate3(data: bytes) -> list[bytes | None]:
+    base = 32 + int.from_bytes(data[0:32], "big")
+    count = int.from_bytes(data[base - 32 : base], "big")
+    results: list[bytes | None] = []
+    for i in range(count):
+        item = base + int.from_bytes(data[base + 32 * i : base + 32 * (i + 1)], "big")
+        success = int.from_bytes(data[item : item + 32], "big") == 1
+        payload = item + int.from_bytes(data[item + 32 : item + 64], "big")
+        length = int.from_bytes(data[payload : payload + 32], "big")
+        returned = data[payload + 32 : payload + 32 + length]
+        results.append(bytes(returned) if success and returned else None)
+    return results
+
+
+def _aggregate3(client: "ChainClient", calls: list[tuple[str, bytes]]) -> list[bytes | None]:
+    raw = client.w3.eth.call({"to": MULTICALL3_ADDRESS, "data": _encode_aggregate3(calls)})
+    return _decode_aggregate3(bytes(raw))
+
+
+def multicall(client: "ChainClient", calls: list[tuple[str, bytes]], chunk: int = MULTICALL_CHUNK) -> list[bytes | None]:
     if not calls:
         return []
-    contract = client.w3.eth.contract(address=MULTICALL3_ADDRESS, abi=MULTICALL3_ABI)
-    results = contract.functions.aggregate3(
-        [(Web3.to_checksum_address(target), True, calldata) for target, calldata in calls]
-    ).call()
-    return [bytes(data) if success and data else None for success, data in results]
+    results: list[bytes | None] = []
+    for start in range(0, len(calls), chunk):
+        batch = calls[start : start + chunk]
+        try:
+            results.extend(_aggregate3(client, batch))
+        except Exception:
+            if chunk <= MULTICALL_MIN_CHUNK:
+                raise
+            results.extend(multicall(client, batch, chunk // 2))
+    return results
 
 
 @dataclass
@@ -210,6 +261,47 @@ def sweep_balances(client: ChainClient, address: str, tokens: dict[str, str]) ->
                 "symbol": decode_string(symbol) if symbol else registry_symbol.upper(),
                 "raw_amount": decode_uint(raw),
                 "decimals": decode_uint(decimals) if decimals else 18,
+            }
+        )
+    return wei, rows
+
+
+SWEEP_CHUNK = 1500
+
+
+def sweep_catalog(client: "ChainClient", address: str, tokens: list[CatalogToken]) -> tuple[int, list[dict]]:
+    holder = Web3.to_checksum_address(address)
+    balance_of = encode_erc20("balanceOf", [holder])
+    calls = [(MULTICALL3_ADDRESS, encode_get_eth_balance(holder))]
+    calls += [(token.address, balance_of) for token in tokens]
+    results = multicall(client, calls, SWEEP_CHUNK)
+    wei = decode_uint(results[0]) if results[0] else 0
+    hits = [(token, decode_uint(raw)) for token, raw in zip(tokens, results[1:], strict=True) if raw and decode_uint(raw)]
+    incomplete = [token for token, _ in hits if token.decimals is None]
+    metadata: dict[str, tuple[int, str]] = {}
+    if incomplete:
+        meta_calls = []
+        for token in incomplete:
+            meta_calls.append((token.address, encode_erc20("decimals")))
+            meta_calls.append((token.address, encode_erc20("symbol")))
+        meta = multicall(client, meta_calls)
+        for i, token in enumerate(incomplete):
+            decimals, symbol = meta[2 * i : 2 * i + 2]
+            metadata[token.address] = (
+                decode_uint(decimals) if decimals else 18,
+                decode_string(symbol) if symbol else token.symbol,
+            )
+    rows = []
+    for token, raw in hits:
+        decimals, symbol = metadata.get(token.address, (token.decimals, token.symbol))
+        rows.append(
+            {
+                "registry_symbol": token.symbol.lower() if token.source == "registry" else None,
+                "token_address": token.address,
+                "symbol": symbol,
+                "raw_amount": raw,
+                "decimals": decimals,
+                "catalog": token,
             }
         )
     return wei, rows

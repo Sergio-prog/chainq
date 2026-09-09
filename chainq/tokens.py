@@ -1,4 +1,3 @@
-from chainq.errors import ChainqError
 from chainq.networks import Network
 from chainq.solana import is_solana_address
 
@@ -94,16 +93,16 @@ def resolve_token(coin: str, network: Network) -> str:
             return mint
         if is_solana_address(coin.strip()):
             return coin.strip()
-        known = ", ".join(sorted(SOLANA_TOKENS))
-        raise ChainqError(
-            f"unknown token '{coin}' on {network.name} (known symbols: {known}); pass the mint address instead"
-        )
+        return _catalog_address(network, coin)
     if coin.startswith("0x") and len(coin) == 42:
         return coin
     address = TOKENS.get(network.key, {}).get(coin.strip().lower())
     if address is None:
-        known = ", ".join(sorted(TOKENS.get(network.key, {}))) or "none"
-        raise ChainqError(
-            f"unknown token '{coin}' on {network.name} (known symbols: {known}); pass the contract address instead"
-        )
+        return _catalog_address(network, coin)
     return address
+
+
+def _catalog_address(network: Network, coin: str) -> str:
+    from chainq import catalog
+
+    return catalog.resolve_one(network.key, coin).address

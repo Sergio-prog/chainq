@@ -4,7 +4,7 @@ from typing import Annotated
 import typer
 from web3 import Web3
 
-from chainq import solana
+from chainq import catalog, pricing, solana
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
@@ -16,9 +16,8 @@ from chainq.rpc import (
     encode_erc20,
     multicall,
     resolve_address,
-    sweep_balances,
+    sweep_catalog,
 )
-from chainq.tokens import MINT_TO_SYMBOL, TOKENS
 
 NetworkOpt = Annotated[str, typer.Option("--network", "-n", help="network key, alias, or chain id")]
 
@@ -78,34 +77,45 @@ def _erc20_profile(client, addr: str) -> dict | None:
     }
 
 
-def _holdings(client, net, addr: str) -> tuple[list[dict], float | None, Decimal]:
-    wei, rows = sweep_balances(client, addr, TOKENS.get(net.key, {}))
+def _holdings(client, net, addr: str) -> tuple[list[dict], int, float | None, Decimal]:
+    wei, rows = sweep_catalog(client, addr, list(catalog.tokens_for(net.key)))
     native_amount = Decimal(wei) / Decimal(10**18)
-    ids = {net.native_coingecko_id}
+    assets = [
+        {
+            "network": net.key,
+            "symbol": net.native_symbol,
+            "token_address": None,
+            "amount": str(native_amount),
+            "coingecko_id": net.native_coingecko_id,
+        }
+    ]
     for row in rows:
-        cg_id = coingecko.SYMBOL_TO_ID.get(row["registry_symbol"])
-        row["coingecko_id"] = cg_id
-        if cg_id:
-            ids.add(cg_id)
-    try:
-        prices = coingecko.simple_price(sorted(ids))
-    except Exception:
-        prices = {}
-    native_price = (prices.get(net.native_coingecko_id) or {}).get("usd")
-    holdings = []
-    for row in rows:
-        amount = Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"])
-        price = (prices.get(row.pop("coingecko_id")) or {}).get("usd")
-        holdings.append(
+        assets.append(
             {
+                "network": net.key,
                 "symbol": row["symbol"],
                 "token_address": row["token_address"],
-                "amount": str(amount),
-                "value_usd": float(amount) * price if price is not None else None,
+                "amount": str(Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"])),
+                "kind": row["catalog"].kind,
+                "coingecko_id": row["catalog"].coingecko_id,
             }
         )
-    holdings.sort(key=lambda h: (h["value_usd"] is None, -(h["value_usd"] or 0)))
-    return holdings, native_price, native_amount
+    pricing.price_assets(assets)
+    native_price = assets[0]["price_usd"]
+    holdings = [
+        {
+            "symbol": a["symbol"],
+            "token_address": a["token_address"],
+            "amount": a["amount"],
+            "kind": a["kind"],
+            "value_usd": a["value_usd"],
+            "price_source": a["price_source"],
+        }
+        for a in assets[1:]
+        if a["value_usd"] is not None
+    ]
+    holdings.sort(key=lambda h: -h["value_usd"])
+    return holdings, len(rows) - len(holdings), native_price, native_amount
 
 
 def _evm_address(out: Out, target: str, net) -> None:
@@ -113,7 +123,7 @@ def _evm_address(out: Out, target: str, net) -> None:
     client = connect(net)
     code = client.w3.eth.get_code(addr)
     nonce = client.w3.eth.get_transaction_count(addr)
-    holdings, native_price, native_amount = _holdings(client, net, addr)
+    holdings, holdings_hidden, native_price, native_amount = _holdings(client, net, addr)
     native_value = float(native_amount) * native_price if native_price is not None else None
     code_hex = code.hex().removeprefix("0x")
     delegated_to = Web3.to_checksum_address(f"0x{code_hex[6:46]}") if code_hex.startswith("ef0100") else None
@@ -140,6 +150,7 @@ def _evm_address(out: Out, target: str, net) -> None:
         "native_amount": str(native_amount),
         "native_value_usd": native_value,
         "holdings": holdings,
+        "holdings_hidden": holdings_hidden,
         "explorer": f"{net.explorer}/address/{addr}",
     }
     what = "EOA (wallet)" if kind == "eoa" else f"contract ({len(code):,} bytes)"
@@ -166,7 +177,8 @@ def _evm_address(out: Out, target: str, net) -> None:
             for h in holdings[:5]
         )
         more = f" (+{len(holdings) - 5} more)" if len(holdings) > 5 else ""
-        lines.append(f"  tokens: {shown}{more}")
+        unpriced = f" ({holdings_hidden} unpriced hidden)" if holdings_hidden else ""
+        lines.append(f"  tokens: {shown}{more}{unpriced}")
     out.emit(
         data,
         lines,
@@ -194,10 +206,13 @@ def _solana_address(out: Out, target: str, net) -> None:
         kind = f"account owned by {owner}"
     accounts = [] if executable else [a for a in solana.token_accounts(addr) if a["raw_amount"]]
     totals: dict[str, Decimal] = {}
+    names: dict[str, str] = {}
     for account in accounts:
-        if account["mint"] in MINT_TO_SYMBOL:
+        token = catalog.lookup("solana", account["mint"])
+        if token is not None:
+            names[account["mint"]] = token.symbol
             totals[account["mint"]] = totals.get(account["mint"], Decimal(0)) + Decimal(account["amount"])
-    known = [{"mint": mint, "amount": str(total)} for mint, total in totals.items()]
+    known = [{"symbol": names[mint], "mint": mint, "amount": str(total)} for mint, total in totals.items()]
     data = {
         "address": addr,
         "input": target,
@@ -207,9 +222,7 @@ def _solana_address(out: Out, target: str, net) -> None:
         "native_amount": str(amount),
         "native_value_usd": value,
         "token_accounts": len(accounts),
-        "known_tokens": [
-            {"symbol": MINT_TO_SYMBOL[a["mint"]].upper(), "mint": a["mint"], "amount": a["amount"]} for a in known
-        ],
+        "known_tokens": known,
         "explorer": f"{net.explorer}/account/{addr}",
     }
     lines = [f"{short_addr(addr)} on Solana: {kind}"]
@@ -218,7 +231,7 @@ def _solana_address(out: Out, target: str, net) -> None:
         native_line += f" (~{fmt_usd(value)})"
     lines.append(native_line)
     if accounts:
-        shown = ", ".join(f"{fmt_amount(a['amount'])} {MINT_TO_SYMBOL[a['mint']].upper()}" for a in known[:5])
+        shown = ", ".join(f"{fmt_amount(a['amount'])} {a['symbol']}" for a in known[:5])
         summary = f"  token accounts: {len(accounts)}"
         if shown:
             summary += f" — {shown}"

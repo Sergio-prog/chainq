@@ -4,14 +4,14 @@ from typing import Annotated
 
 import typer
 
-from chainq import solana
+from chainq import catalog, pricing, solana
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, hyperliquid
-from chainq.rpc import connect, erc20, resolve_address, sweep_balances
-from chainq.tokens import MINT_TO_SYMBOL, TOKENS
+from chainq.rpc import connect, erc20, resolve_address, sweep_catalog
+from chainq.tokens import TOKENS
 
 
 def _scan_evm_legacy(client, net, address: str) -> list[dict]:
@@ -39,6 +39,8 @@ def _scan_evm_legacy(client, net, address: str) -> list[dict]:
                 "symbol": contract.functions.symbol().call(),
                 "token_address": token_address,
                 "amount": str(Decimal(raw) / Decimal(10**decimals)),
+                "kind": "token",
+                "source": "registry",
                 "coingecko_id": coingecko.SYMBOL_TO_ID.get(symbol),
             }
         )
@@ -49,7 +51,7 @@ def _scan_evm(net_key: str, address: str) -> list[dict]:
     net = NETWORKS[net_key]
     client = connect(net)
     try:
-        wei, rows = sweep_balances(client, address, TOKENS.get(net.key, {}))
+        wei, rows = sweep_catalog(client, address, list(catalog.tokens_for(net.key)))
     except Exception:
         return _scan_evm_legacy(client, net, address)
     assets = []
@@ -64,13 +66,16 @@ def _scan_evm(net_key: str, address: str) -> list[dict]:
             }
         )
     for row in rows:
+        token = row["catalog"]
         assets.append(
             {
                 "network": net.key,
                 "symbol": row["symbol"],
                 "token_address": row["token_address"],
                 "amount": str(Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"])),
-                "coingecko_id": coingecko.SYMBOL_TO_ID.get(row["registry_symbol"]),
+                "kind": token.kind,
+                "source": token.source,
+                "coingecko_id": token.coingecko_id,
             }
         )
     return assets
@@ -92,14 +97,16 @@ def _scan_solana(address: str) -> list[dict]:
     for account in solana.token_accounts(address):
         if not account["raw_amount"]:
             continue
-        registry_symbol = MINT_TO_SYMBOL.get(account["mint"])
+        token = catalog.lookup("solana", account["mint"])
         assets.append(
             {
                 "network": "solana",
-                "symbol": registry_symbol.upper() if registry_symbol else short_addr(account["mint"]),
+                "symbol": token.symbol if token else short_addr(account["mint"]),
                 "token_address": account["mint"],
                 "amount": account["amount"],
-                "coingecko_id": coingecko.SYMBOL_TO_ID.get(registry_symbol),
+                "kind": token.kind if token else "unknown",
+                "source": token.source if token else None,
+                "coingecko_id": token.coingecko_id if token else None,
             }
         )
     return assets
@@ -124,6 +131,7 @@ def _scan_hyperliquid(address: str) -> list[dict]:
                     "token_address": None,
                     "amount": str(equity),
                     "price_usd": 1.0,
+                    "price_source": "hyperliquid",
                     "value_usd": equity,
                 }
             )
@@ -152,24 +160,10 @@ def _scan_hyperliquid(address: str) -> list[dict]:
                 "token_address": None,
                 "amount": str(total),
                 "price_usd": price,
+                "price_source": "hyperliquid" if price is not None else None,
                 "value_usd": total * price if price is not None else None,
             }
         )
-    return assets
-
-
-def _priced(assets: list[dict]) -> list[dict]:
-    ids = sorted({a["coingecko_id"] for a in assets if a["coingecko_id"]})
-    prices = {}
-    if ids:
-        try:
-            prices = coingecko.simple_price(ids)
-        except Exception:
-            prices = {}
-    for asset in assets:
-        price = (prices.get(asset.pop("coingecko_id")) or {}).get("usd")
-        asset["price_usd"] = price
-        asset["value_usd"] = float(asset["amount"]) * price if price is not None else None
     return assets
 
 
@@ -196,9 +190,12 @@ def portfolio(
     networks: Annotated[
         list[str] | None, typer.Option("--network", "-n", help="network(s) to scan; default: all")
     ] = None,
-    min_usd: Annotated[float, typer.Option("--min-usd", help="hide assets worth less than this")] = 0.01,
+    min_usd: Annotated[float, typer.Option("--min-usd", help="hide assets worth less than this")] = 1.0,
+    show_all: Annotated[
+        bool, typer.Option("--all", help="also show unpriced assets and those below --min-usd")
+    ] = False,
     hide_unpriced: Annotated[
-        bool, typer.Option("--hide-unpriced", help="drop assets with no known USD price")
+        bool, typer.Option("--hide-unpriced", help="drop unpriced assets even with --all (default without --all)")
     ] = False,
     defi: Annotated[
         bool, typer.Option("--defi", help="also fold in Hyperliquid perp equity and spot balances")
@@ -208,7 +205,7 @@ def portfolio(
     verbose: VerboseOpt = False,
     format: FormatOpt = "text",
 ):
-    """Sweep native + known tokens across networks with USD totals."""
+    """Sweep native + every catalog token across networks with USD totals."""
     out = Out(json_out, quiet, verbose, format)
     addr, keys = _resolve_scan_target(address, networks)
     assets: list[dict] = []
@@ -220,20 +217,21 @@ def portfolio(
                 assets.extend(future.result())
             except Exception:
                 unreachable.append(futures[future])
-    assets = _priced(assets)
+    assets = pricing.price_assets(assets)
     if defi and addr.startswith("0x"):
         assets.extend(_scan_hyperliquid(addr))
     kept = []
     hidden = 0
     for a in assets:
         if a["value_usd"] is None:
-            if hide_unpriced:
-                hidden += 1
-                continue
-        elif a["value_usd"] < min_usd:
+            trusted = a["token_address"] is None or a.get("source") == "registry"
+            visible = (show_all or trusted) and not hide_unpriced
+        else:
+            visible = show_all or a["value_usd"] >= min_usd
+        if visible:
+            kept.append(a)
+        else:
             hidden += 1
-            continue
-        kept.append(a)
     assets = kept
     assets.sort(key=lambda a: (a["value_usd"] is None, -(a["value_usd"] or 0)))
     if not assets and unreachable:
@@ -256,7 +254,8 @@ def portfolio(
         for a in assets
     ]
     if hidden:
-        lines.append(f"  ({hidden} asset(s) below {fmt_usd(min_usd)}{' or unpriced' if hide_unpriced else ''} hidden)")
+        reason = "unpriced" if show_all else f"below {fmt_usd(min_usd)} or unpriced; --all shows them"
+        lines.append(f"  ({hidden} asset(s) hidden: {reason})")
     if unreachable:
         lines.append(f"  (unreachable: {', '.join(sorted(unreachable))})")
     out.emit(
@@ -264,7 +263,8 @@ def portfolio(
         lines,
         quiet_value=total,
         verbose_lines=[
-            f"scanned {len(keys)} network(s), registry tokens" + (" + Hyperliquid" if defi else ""),
+            f"scanned {len(keys)} network(s), {sum(len(catalog.tokens_for(k)) for k in keys):,} catalog tokens"
+            + (" + Hyperliquid" if defi else ""),
             f"address: {addr}",
         ],
     )

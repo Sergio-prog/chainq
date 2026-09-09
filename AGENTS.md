@@ -23,7 +23,7 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 
 - `chainq/cli.py` registers commands; `chainq/commands/*` are thin Typer layers; protocol commands (aave, hl) mount under the `protocols` group.
 - `chainq/providers/*` are HTTP clients (CoinGecko, Hyperliquid, Aave GraphQL) using `chainq/cache.py` (TTL 30–300s, `~/.cache/chainq/`).
-- `chainq/networks.py` and `chainq/tokens.py` are curated registries (checksummed addresses — tests enforce; SPL mints live in `SOLANA_TOKENS`); `chainq/rpc.py` wraps web3 with RPC fallback and Multicall3 batching (prefer `multicall`/`sweep_balances` over per-token calls); `chainq/solana.py` is the Solana JSON-RPC client (base58, balances, token accounts); `chainq/output.py` owns all formatting.
+- `chainq/networks.py` and `chainq/tokens.py` are curated registries (checksummed addresses — tests enforce; SPL mints live in `SOLANA_TOKENS`); `chainq/catalog.py` layers the daily-cached token catalog (CoinGecko per-network lists, Aave, Pendle, Jupiter) on top for symbol resolution and sweeps, and `chainq/pricing.py` is the shared price cascade (CoinGecko → DefiLlama/Jupiter → Pendle → DexScreener with a liquidity floor); `chainq/rpc.py` wraps web3 with RPC fallback and Multicall3 batching (prefer `multicall`/`sweep_balances` over per-token calls); `chainq/solana.py` is the Solana JSON-RPC client (base58, balances, token accounts); `chainq/output.py` owns all formatting.
 - `chainq/update.py` — self-update + once-daily version reminder (disable via `CHAINQ_NO_UPDATE_CHECK`).
 - don't forget that there is landing site in ./site.
 

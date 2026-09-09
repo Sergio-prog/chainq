@@ -19,6 +19,7 @@ from chainq.commands import (
     portfolio,
     protocols,
     stables,
+    tokens,
     yields,
 )
 from chainq.errors import ChainqError
@@ -70,6 +71,7 @@ app.command()(etf.etf)
 app.command()(update.update)
 app.add_typer(protocols.app, name="protocols")
 app.add_typer(nft.app, name="nft")
+app.add_typer(tokens.app, name="tokens")
 app.add_typer(config.app, name="config")
 
 

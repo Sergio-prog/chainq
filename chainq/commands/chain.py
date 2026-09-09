@@ -9,7 +9,7 @@ from web3 import Web3
 from web3.exceptions import TransactionNotFound
 from web3.types import RPCEndpoint
 
-from chainq import solana
+from chainq import catalog, pricing, solana
 from chainq.errors import ChainqError
 from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
@@ -25,7 +25,7 @@ from chainq.rpc import (
     multicall,
     resolve_address,
 )
-from chainq.tokens import MINT_TO_SYMBOL, resolve_token
+from chainq.tokens import resolve_token
 
 TRANSFER_TOPIC = Web3.keccak(text="Transfer(address,address,uint256)")
 
@@ -85,18 +85,27 @@ def _erc20_snapshot(client, token_address: str, holder: str) -> tuple[int, str, 
         )
 
 
-def _solana_balance(address: str, coin: str | None, net) -> tuple[str, Decimal, str, str | None, float | None]:
+def _token_price(net, symbol: str, token_address: str, amount: Decimal) -> tuple[float | None, str | None]:
+    asset = {"network": net.key, "symbol": symbol, "token_address": token_address, "amount": str(amount)}
+    token = catalog.lookup(net.key, token_address)
+    if token is not None and token.coingecko_id:
+        asset["coingecko_id"] = token.coingecko_id
+    pricing.price_assets([asset])
+    return asset["price_usd"], asset["price_source"]
+
+
+def _solana_balance(address: str, coin: str | None, net) -> tuple[str, Decimal, str, str | None, float | None, str]:
     addr = solana.resolve_solana_address(address)
     if coin is None:
         amount = solana.lamports_to_sol(solana.get_balance(addr))
-        return addr, amount, "SOL", None, coingecko.try_price_usd("solana")
+        return addr, amount, "SOL", None, coingecko.try_price_usd("solana"), "coingecko"
     mint = resolve_token(coin, net)
     bal = solana.token_balance(addr, mint)
     amount = Decimal(bal["raw_amount"]) / Decimal(10 ** bal["decimals"]) if bal else Decimal(0)
-    registry_symbol = MINT_TO_SYMBOL.get(mint)
-    symbol = registry_symbol.upper() if registry_symbol else short_addr(mint)
-    price = coingecko.try_price_usd(coingecko.SYMBOL_TO_ID.get(registry_symbol))
-    return addr, amount, symbol, mint, price
+    token = catalog.lookup("solana", mint)
+    symbol = token.symbol if token else short_addr(mint)
+    price, source = _token_price(net, symbol, mint, amount)
+    return addr, amount, symbol, mint, price, source
 
 
 def balance(
@@ -116,7 +125,7 @@ def balance(
     if net.kind != "solana" and solana.looks_like_solana(address):
         net = resolve_network("solana")
     if net.kind == "solana":
-        addr, amount, symbol, token_address, price = _solana_balance(address, coin, net)
+        addr, amount, symbol, token_address, price, price_source = _solana_balance(address, coin, net)
         rpc_note = "solana rpc"
     else:
         addr = resolve_address(address)
@@ -127,13 +136,13 @@ def balance(
             amount = Decimal(wei) / Decimal(10**18)
             symbol = net.native_symbol
             price = coingecko.try_price_usd(net.native_coingecko_id)
+            price_source = "coingecko"
             token_address = None
         else:
             token_address = resolve_token(coin, net)
             raw, symbol, decimals = _erc20_snapshot(client, token_address, addr)
             amount = Decimal(raw) / Decimal(10**decimals)
-            cg_id = coingecko.SYMBOL_TO_ID.get(coin.lower()) if not coin.startswith("0x") else None
-            price = coingecko.try_price_usd(cg_id)
+            price, price_source = _token_price(net, symbol, token_address, amount)
     usd_value = float(amount) * price if price is not None else None
     data = {
         "address": addr,
@@ -157,7 +166,7 @@ def balance(
             rpc_note,
             f"address: {addr}",
             *([f"token: {token_address}"] if token_address else []),
-            *([f"price used: {fmt_usd(price)} [coingecko]"] if price is not None else []),
+            *([f"price used: {fmt_usd(price)} [{price_source}]"] if price is not None else []),
         ],
     )
 

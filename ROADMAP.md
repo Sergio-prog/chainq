@@ -10,11 +10,13 @@ Per-version history lives in [CHANGELOG.md](CHANGELOG.md). Current surface: 26 E
 
 ## Next
 
-- **Portfolio depth, part 2** — Hyperliquid folding shipped in v0.12; still to do: Aave/Morpho supplied positions (onchain aToken / UiPoolDataProvider reads or protocol user endpoints), and auto token lists per network from CoinGecko (top ~50 by mcap, cached daily) so the sweep catches far more than the curated registry. Solana portfolio pricing for long-tail mints (DexScreener batch lookup) would fold in here too.
+- **Portfolio depth, part 2** — Hyperliquid folding shipped in v0.12; the token catalog (v0.20: CoinGecko per-network lists + Aave/Pendle/Jupiter, catalog-wide sweeps, Jupiter/DefiLlama pricing, spam hidden by default) shipped the token-list and long-tail Solana pricing halves. Still to do: Aave/Morpho supplied positions with debt and health factor (aTokens already show as balances; use UiPoolDataProvider or protocol user endpoints).
+- **Catalog-driven features** — the catalog (`chainq/catalog.py`, `chainq tokens`) is the base for token ranking/scoring and a token/protocol index; both need a market-cap or liquidity signal per entry (CoinGecko markets, Jupiter `organicScore`) that the catalog does not carry yet.
 
 ## Later
 
 - Address intelligence depth: deploy date and verified source for contracts (needs explorer APIs), NFT holdings summary.
+- Explorer-based holder discovery (Blockscout/Etherscan "tokens held by address") for tokens outside the catalog: deliberately not done — public instances are unreliable and it is where airdrop spam comes from. Revisit only behind an explicit `--discover` flag if unlisted holdings turn out to matter.
 - Generic ERC-4626 inspector: `chainq vault 0xADDR -n base` — asset, share price, APY from share-price delta, TVL; covers thousands of yield vaults with zero per-protocol work.
 - NFT depth: wallet holdings and collection-by-contract-address lookup (both need a valid OpenSea key), floor cross-check via a second marketplace.
 - CEX spot prices via ccxt as a CoinGecko alternative/cross-check.

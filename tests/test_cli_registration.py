@@ -24,5 +24,12 @@ def test_help_command_matches_root_help():
 
 def test_help_lists_new_commands():
     result = runner.invoke(app, ["--help"])
-    for name in ("buybacks", "etf", "help"):
+    for name in ("buybacks", "etf", "help", "tokens"):
+        assert name in result.output
+
+
+def test_tokens_group_registered():
+    result = runner.invoke(app, ["tokens", "--help"])
+    assert result.exit_code == 0
+    for name in ("search", "refresh", "status"):
         assert name in result.output

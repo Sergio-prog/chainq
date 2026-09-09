@@ -6,6 +6,38 @@ from chainq.errors import ChainqError
 BASE_URL = "https://api.llama.fi"
 STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins"
 YIELDS_URL = "https://yields.llama.fi/pools"
+COINS_URL = "https://coins.llama.fi/prices/current"
+COINS_BATCH = 80
+MIN_CONFIDENCE = 0.5
+
+CHAIN_SLUGS = {
+    "ethereum": "ethereum",
+    "arbitrum": "arbitrum",
+    "base": "base",
+    "optimism": "optimism",
+    "polygon": "polygon",
+    "bsc": "bsc",
+    "avalanche": "avax",
+    "gnosis": "xdai",
+    "unichain": "unichain",
+    "linea": "linea",
+    "scroll": "scroll",
+    "zksync": "era",
+    "mantle": "mantle",
+    "blast": "blast",
+    "sonic": "sonic",
+    "berachain": "berachain",
+    "worldchain": "wc",
+    "ink": "ink",
+    "soneium": "soneium",
+    "celo": "celo",
+    "sei": "sei",
+    "hyperevm": "hyperliquid",
+    "monad": "monad",
+    "plasma": "plasma",
+    "katana": "katana",
+    "robinhood": "robinhood",
+}
 
 
 def _fetch(url: str, params: dict | None = None) -> dict | list:
@@ -176,3 +208,29 @@ def yield_pools(projects: tuple[str, ...] | None = None) -> list[dict]:
     if projects:
         return [p for p in cached if p["project"] in projects]
     return cached
+
+
+def token_prices(pairs: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
+    ids = {}
+    for network_key, address in pairs:
+        slug = CHAIN_SLUGS.get(network_key)
+        if slug:
+            ids[f"{slug}:{address}"] = (network_key, address)
+    keys = sorted(ids)
+    prices: dict[tuple[str, str], dict] = {}
+    for start in range(0, len(keys), COINS_BATCH):
+        batch = keys[start : start + COINS_BATCH]
+        cache_key = cache.key_for("llama-coins", batch)
+        payload = cache.get(cache_key)
+        if payload is None:
+            try:
+                payload = _fetch(f"{COINS_URL}/{','.join(batch)}").get("coins") or {}
+            except ChainqError:
+                continue
+            cache.put(cache_key, payload, 60)
+        for coin_id, coin in payload.items():
+            price = coin.get("price")
+            confidence = coin.get("confidence", 1.0)
+            if coin_id in ids and isinstance(price, (int, float)) and price > 0 and confidence >= MIN_CONFIDENCE:
+                prices[ids[coin_id]] = {"price": float(price), "confidence": float(confidence)}
+    return prices
