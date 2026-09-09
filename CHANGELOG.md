@@ -2,6 +2,14 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.20.0
+
+### Features
+- token catalog with catalog-wide sweeps, price cascade, and spam-free portfolios
+
+### Documentation
+- record plan 010 execution and unblock 011
+
 ## v0.19.0
 
 ### Features
