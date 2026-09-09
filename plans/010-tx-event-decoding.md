@@ -19,7 +19,21 @@
 - **Depends on**: plans/004-tx-decode.md (merged via PR #6, in `main` at `ec93976`)
 - **Category**: direction
 - **Planned at**: commit `ec93976`, 2026-07-28
-- **Status**: TODO
+- **Implemented**: branch `feat/tx-event-decoding`, commit `a14ffbd`, based on
+  `main` at `bf51081`. Executed by a subagent in an isolated worktree and
+  reviewed over two rounds on 2026-07-28; **APPROVED**, unmerged — the merge is
+  the owner's call. Round 1 was returned for one defect (brand-name labels on
+  forkable lending and wrapping signatures, which mislabeled Spark and a second
+  Aave fork as "Aave" in a real transaction); fixed in round 2. Final state:
+  ruff clean, 152 passed / 24 deselected, scope limited to the 5 in-scope files,
+  and a plain ETH send plus a plain ERC-20 transfer verified byte-identical to
+  `main`.
+- **Known plan bug found during execution**: Step 5's suppression list
+  (`send`, `call`) contradicts the byte-identical done criterion, because a
+  plain ERC-20 transfer classifies as `transfer` and would gain an `action`
+  line. The executor correctly extended suppression to `transfer` and filtered
+  `kind == "transfer"` out of `events`. Any future re-run of this plan should
+  read the list as `("send", "call", "transfer")`.
 
 ## Why this matters
 
@@ -125,12 +139,16 @@ recorded in Step 1), so the executor is not decoding from memory.
 ### Step 1: The event registry
 
 Create `chainq/decode.py`. Key the registry by **`(topic0, len(topics))`**, not
-by `topic0` alone. This is not defensive over-engineering — Safe changed
-`ExecutionSuccess` from non-indexed to `indexed` between contract versions
-without changing the signature string, so one topic0 legitimately maps to two
-different layouts, and plan 011 needs the same registry. Keying on the pair also
-means a log whose layout does not match is simply not decoded, instead of being
-mis-decoded into confident nonsense.
+by `topic0` alone. This is not defensive over-engineering — the table below
+already contains a case that a topic0-only registry gets wrong:
+`Transfer(address,address,uint256)` is emitted by ERC-20 with 3 topics and by
+ERC-721 with 4 (the token id is indexed), one topic0, two meanings. Plan 004
+handles this today with a bare `len(log["topics"]) == 3` check; the compound key
+generalizes it. Keying on the pair also means a log whose layout does not match
+is simply not decoded, instead of being mis-decoded into confident nonsense —
+and plan 011 needs the same property for Safe, which changed `ExecutionSuccess`
+from non-indexed to indexed between contract versions without changing the
+signature string.
 
 ```python
 @dataclass(frozen=True)
@@ -339,7 +357,11 @@ which already builds byte fixtures with a `_topic(address)` helper.
 
 - registry keying: a log with a known topic0 but the wrong topic count returns
   `None` rather than a wrong decode
-- both Safe-style layouts of one signature resolve to their own spec
+- the compound key works on the table's own dual-layout case:
+  `Transfer(address,address,uint256)` is registered at **both** 3 topics
+  (ERC-20, `kind == "transfer"`) and 4 topics (ERC-721, `kind == "nft"`) under
+  one topic0. Assert each resolves to its own spec — this is exactly why the
+  key is `(topic0, topic_count)` and not `topic0`.
 - indexed address extraction; signed `int256` swap amounts decode negative
 - dynamic indexed types surface as a hash, not a bogus value
 - malformed `data` returns `None` and does not raise
@@ -356,8 +378,7 @@ which already builds byte fixtures with a `_topic(address)` helper.
       output to `main` (demonstrate the comparison in your report)
 - [ ] Live swap, approval, lending-supply, and vault-deposit txs each show the
       right `action` and a correct `net for …` line
-- [ ] Every registry entry has been observed in a live log, or was dropped and
-      reported
+- [ ] The registry contains exactly the rows in the Step 1 table — none added
 - [ ] `--json` gains `action`, `events`, `net_flow`; no existing key changed
 - [ ] A malformed or undecodable log leaves the baseline readout intact
 - [ ] `git status` shows only in-scope files modified; `plans/README.md` updated
@@ -366,8 +387,9 @@ which already builds byte fixtures with a `_topic(address)` helper.
 
 Stop and report back if:
 
-- A signature in the Step 1 table cannot be observed live and you cannot find a
-  correct replacement — report the observed topic0 instead of guessing.
+- A signature in the Step 1 table decodes wrongly against a real log — report
+  the observed topics and data words instead of "correcting" the signature.
+  The table is fixed; changing it is a decision, not a fix.
 - `log["topics"]` or `log["data"]` are not `HexBytes` in the pinned web3
   version — report the actual types before adapting.
 - Decoding requires an extra RPC round-trip to be useful (e.g. you conclude the
@@ -386,5 +408,12 @@ Stop and report back if:
 - `action` and the 4byte `function` are both labels. Never branch on either.
 - ERC-721/1155 rows are in the registry for classification only. Rendering NFT
   transfers with token ids and collection names is a separate feature.
+- **Label by shape, never by brand.** Every signature in this registry is
+  forkable and most are forked in practice: four distinct contracts emitted the
+  Aave `Supply` signature in one 500-block sample, eleven emitted WETH's
+  `Deposit` in 60 blocks. Labels therefore read `Aave-style`, `v3-style`,
+  `wrapped-native`. Reviewers should reject any future row that names a specific
+  deployment. Standard names (`ERC-20`, `ERC-4626`, `Permit2`) are fine — they
+  name a specification, not a deployment.
 - Plan 011 (ERC-4337 + Safe) consumes `EVENTS` and `decode_log` unchanged. Keep
   `chainq/decode.py` free of network access so it stays reusable.

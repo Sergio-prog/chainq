@@ -23,9 +23,9 @@ work on the named branch and report to the owner.
 | 004 | `chainq tx` decodes function + token transfers | P2 | M | — | DONE — merged via PR #6 on 2026-07-27 (`ec93976`) |
 | 007 | Add Robinhood Chain mainnet | P1 | S | — | DONE — PR #2 replayed onto current `main` (merge + doc redo, publicnode fallback RPC); lint, tests, and live gas/balance/portfolio verified 2026-09-03 |
 | 009 | Add read-only Pump/PumpSwap state | P1 | L | 001 (merged) | TODO — refreshed to `a18daab`, executable |
-| 010 | `chainq tx` names the action — swaps, approvals, lending, vaults, wraps | P1 | L | 004 (merged) | TODO — written 2026-07-28 at `ec93976`; every event signature verified live |
+| 010 | `chainq tx` names the action — swaps, approvals, lending, vaults, wraps | P1 | L | 004 (merged) | DONE — reviewed and APPROVED 2026-07-28 after one revision round; on `feat/tx-event-decoding` (`a14ffbd`), unmerged — the merge is the owner's call |
 | 005 | `uniswap quote` — amount-aware swap quotes | P2 | M | — | TODO — zero drift since it was written; directly executable |
-| 011 | `chainq tx` sees through bundlers and multisigs (ERC-4337, Safe) | P2 | M | **010** | TODO — blocked on 010; event layouts read out of real receipts |
+| 011 | `chainq tx` sees through bundlers and multisigs (ERC-4337, Safe) | P2 | M | 010 (done, unmerged) | TODO — unblocked; base it on `feat/tx-event-decoding`, not `main`, until 010 merges |
 | 006 | Polymarket under `protocols` | P3 | M | — | TODO — refreshed to `a18daab`, executable |
 | 002 | `chainq read` — generic contract read | P1 | M | — | REJECTED — v0.16 independently shipped the capability as `chainq evm call` |
 
@@ -39,7 +39,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - 007 must not be rebased or merged wholesale — see Step 0 in its plan.
 - 004 is merged; 010 builds directly on the `_decode_transfers` helper it added.
 - 011 depends on 010 for `chainq/decode.py` and its `(topic0, topic_count)`
-  registry key. Do not start 011 first — it has no decoder to extend.
+  registry key. 010 is built but unmerged, so 011 must branch from
+  `feat/tx-event-decoding` until the owner merges it.
 - Every plan updates `skills/chainq/SKILL.md`; when batching features, merge by
   section and regenerate `site/public/llms-full.txt` after the final skill edit
   (`pnpm --dir site build` runs `scripts/gen-llms-full.mjs` as `prebuild`).
@@ -137,6 +138,43 @@ Plans 010 and 011 were written at `ec93976` (PR #6 merged) as the follow-up to
   `chainq tx` output captured at `ec93976`, including the Uniswap v4 swap whose
   ETH leg is invisible because v4 settles natively without a `Transfer` log.
 
+## Execution record — 010, 2026-07-28
+
+Executed by a subagent in an isolated worktree; reviewed over two rounds.
+
+- **Round 1 returned for one defect**: the registry labeled forkable lending and
+  wrapping signatures with brand names (`Aave supply`, `WETH wrap`, …), which
+  the plan explicitly forbids — "a signature is not a protocol". This was not
+  theoretical. In the very transaction the executor's own decode produced
+  (`0xd3f66bbf…d487`), the events labeled "Aave supply" and "Aave borrow" were
+  emitted by Spark (`0xC13e21B6…E987`) and by a second Aave v3 fork
+  (`0x4e033931…58B1`) — not by Aave. Over a 500-block window four distinct
+  contracts emit `Supply(address,address,address,uint256,uint16)` and only one
+  is the Aave Pool; over 60 blocks, eleven distinct contracts emit
+  `Deposit(address,uint256)`. Fixed in round 2 by renaming to `Aave-style`,
+  `Compound-style`, `Morpho-style`, and `wrapped-native`. Standard names
+  (`ERC-20`, `ERC-4626`, `Permit2`) were deliberately left alone — they name
+  specifications, not deployments.
+- **One executor deviation accepted on merit.** Step 5 said to suppress the
+  `action` line for `send` and `call`; the executor extended that to `transfer`
+  and filtered `kind == "transfer"` out of `events`. Without this, a plain
+  ERC-20 transfer gains an `action`/`net` line and fails the plan's own
+  byte-identical done criterion. The plan was internally inconsistent; the
+  executor found it and documented the fix. **Plan bug, not executor error.**
+- **Independently verified by the reviewer**, not taken from the report: ruff
+  clean and 152 passed / 24 deselected; scope limited to the 5 in-scope files;
+  registry exactly 23 rows, all keys `(bytes, int)`; `--json` gains `action`,
+  `events`, `net_flow` with no existing key changed; and a plain ETH send plus a
+  plain ERC-20 transfer produce **byte-identical** output to `main`.
+- **The indexed/data splits were the real risk** — the plan verified topic0
+  hashes live but not the indexed/non-indexed split, which the executor derived
+  from Solidity declarations. Validated against real receipts: Aave
+  `referralCode = 1608` and `interestRateMode = 2` (Variable) land in the right
+  slots, Balancer reads 85,000 USDC → 85,034 USDT, v3 `int256` amounts carry
+  correct signs, Permit2 `expiration` decodes to `2**48 - 1`, and an unlimited
+  approval decodes to exactly `2**256 - 1`. These values cannot come out right
+  if the splits are wrong.
+
 ## Findings considered and rejected
 
 - **Watch/stream mode + threshold alerts**: a daemon changes the tool's character and agents can loop the CLI themselves; stays on ROADMAP "Later". Not planned.
@@ -185,6 +223,14 @@ Plans 010 and 011 were written at `ec93976` (PR #6 merged) as the follow-up to
   rows are in 010's registry for classification, but rendering them well needs
   per-collection metadata and a token-id display policy. Deliberately deferred
   to its own plan rather than bolted onto the transfer list.
+- **Scaling approval amounts by token decimals** (raised during 010 review, not
+  fixed): non-unlimited approvals render as raw base units — `13500000000`
+  rather than `13,500 USDC` — which reads poorly against the AGENTS.md bar for
+  structured human output. It is plan-compliant (010 specified only the
+  `unlimited` render) and was left alone to keep the revision round narrow.
+  Fixing it properly means exposing the metadata `_decode_transfers` already
+  fetches so the approval renderer can reuse it — a design change, not a
+  touch-up, and worth its own plan. **Recommended next follow-up on `tx`.**
 - **Recursive decoding of inner UserOperation `callData` and Safe multisend
   payloads**: a genuine nested call tree is a different output shape (a tree,
   not a line list) and a materially larger surface. 011 surfaces inner effects
