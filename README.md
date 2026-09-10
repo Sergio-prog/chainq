@@ -153,7 +153,7 @@ chainq evm to-wei 1.5 ether                            # 1500000000000000000
 
 Every subcommand supports `--json`, `-q`, `-v`, and `--format`. Existing `chainq balance`, `chainq gas`, `chainq tx`, and `chainq rpc` remain the canonical cross-chain commands.
 
-26 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, ...), or chain id. Multiple public RPCs per network are tried in order; override with `CHAINQ_RPC_<NETWORK>`. Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
+26 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, ...), or chain id. Multiple verified public RPCs per network are tried in order, and every request fails over to the next endpoint on HTTP, rate-limit, or unsupported-method errors; override with `CHAINQ_RPC_<NETWORK>` (tried first). Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 
 ### Protocols
 

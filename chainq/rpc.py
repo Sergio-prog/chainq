@@ -1,9 +1,13 @@
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import re
 from dataclasses import dataclass
+from typing import Any
 
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
+from web3.providers import JSONBaseProvider
+from web3.providers.rpc import HTTPProvider
+from web3.types import RPCEndpoint, RPCResponse
 
 from chainq.catalog import CatalogToken
 from chainq.config import settings
@@ -178,48 +182,97 @@ def multicall(client: "ChainClient", calls: list[tuple[str, bytes]], chunk: int 
     return results
 
 
+FAILOVER_ERROR_CODES = {-32004, -32005, -32601, -32603}
+FAILOVER_MESSAGE = re.compile(
+    r"rate limit|too many|limit exceeded|not supported|unsupported|upstream|unavailable"
+    r"|timed? ?out|forbidden|capacity|overloaded|not able to process",
+    re.IGNORECASE,
+)
+
+
+def describe_failure(exc: Exception) -> str:
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status:
+        return f"HTTP {status}"
+    return type(exc).__name__
+
+
+def is_provider_error(response: RPCResponse) -> bool:
+    error = response.get("error")
+    if not isinstance(error, dict):
+        return False
+    return error.get("code") in FAILOVER_ERROR_CODES or bool(FAILOVER_MESSAGE.search(str(error.get("message", ""))))
+
+
+class FallbackProvider(JSONBaseProvider):
+    def __init__(self, urls: list[str], chain_id: int):
+        super().__init__()
+        self.chain_id = chain_id
+        self.providers = [
+            HTTPProvider(url, request_kwargs={"timeout": settings.rpc_timeout}, exception_retry_configuration=None)
+            for url in urls
+        ]
+        self.active = 0
+        self.verified: set[int] = set()
+        self.dead: set[int] = set()
+
+    @property
+    def url(self) -> str:
+        return self.providers[self.active].endpoint_uri
+
+    def _verify(self, index: int) -> None:
+        if index in self.verified:
+            return
+        response = self.providers[index].make_request(RPCEndpoint("eth_chainId"), [])
+        if "result" not in response:
+            raise ChainqError(f"eth_chainId failed: {response.get('error')}")
+        chain_id = int(response["result"], 16)
+        if chain_id != self.chain_id:
+            self.dead.add(index)
+            raise ChainqError(f"wrong chain id {chain_id}")
+        self.verified.add(index)
+
+    def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
+        failures = []
+        order = [*range(self.active, len(self.providers)), *range(self.active)]
+        for index in order:
+            if index in self.dead:
+                continue
+            provider = self.providers[index]
+            try:
+                self._verify(index)
+                response = provider.make_request(method, params)
+            except Exception as exc:
+                failures.append(f"{provider.endpoint_uri} ({describe_failure(exc)})")
+                continue
+            if is_provider_error(response):
+                failures.append(f"{provider.endpoint_uri} ({response['error'].get('message')})")
+                continue
+            self.active = index
+            return response
+        raise ChainqError(f"all RPC endpoints failed for {method}: {'; '.join(failures)}")
+
+
 @dataclass
 class ChainClient:
     w3: Web3
     network: Network
-    url: str
+    provider: FallbackProvider
 
-
-def _probe(url: str, network: Network) -> ChainClient:
-    w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": settings.rpc_timeout}))
-    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-    chain_id = w3.eth.chain_id
-    if chain_id != network.chain_id:
-        raise ChainqError(f"wrong chain id {chain_id}")
-    return ChainClient(w3=w3, network=network, url=url)
+    @property
+    def url(self) -> str:
+        return self.provider.url
 
 
 def connect(network: Network) -> ChainClient:
-    failures = []
+    urls = list(network.rpc_urls)
     override = os.environ.get(f"CHAINQ_RPC_{network.key.upper()}")
     if override:
-        try:
-            return _probe(override, network)
-        except Exception as exc:
-            failures.append(f"{override} ({type(exc).__name__})")
-    urls = network.rpc_urls
-    if len(urls) == 1:
-        try:
-            return _probe(urls[0], network)
-        except Exception as exc:
-            failures.append(f"{urls[0]} ({type(exc).__name__})")
-            raise ChainqError(f"all RPC endpoints failed for {network.name}: {'; '.join(failures)}") from None
-    pool = ThreadPoolExecutor(max_workers=len(urls))
-    try:
-        futures = {pool.submit(_probe, url, network): url for url in urls}
-        for future in as_completed(futures):
-            try:
-                return future.result()
-            except Exception as exc:
-                failures.append(f"{futures[future]} ({type(exc).__name__})")
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
-    raise ChainqError(f"all RPC endpoints failed for {network.name}: {'; '.join(failures)}")
+        urls.insert(0, override)
+    provider = FallbackProvider(urls, network.chain_id)
+    w3 = Web3(provider)
+    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+    return ChainClient(w3=w3, network=network, provider=provider)
 
 
 def resolve_address(value: str) -> str:

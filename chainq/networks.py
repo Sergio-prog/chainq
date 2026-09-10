@@ -27,9 +27,9 @@ NETWORKS: dict[str, Network] = {
             native_coingecko_id="ethereum",
             rpc_urls=(
                 "https://ethereum-rpc.publicnode.com",
-                "https://eth.llamarpc.com",
-                "https://1rpc.io/eth",
                 "https://eth.drpc.org",
+                "https://rpc.mevblocker.io",
+                "https://1rpc.io/eth",
             ),
             explorer="https://etherscan.io",
             aliases=("eth", "mainnet", "ether"),
@@ -43,7 +43,7 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://arbitrum-one-rpc.publicnode.com",
                 "https://arb1.arbitrum.io/rpc",
-                "https://1rpc.io/arb",
+                "https://arbitrum.drpc.org",
             ),
             explorer="https://arbiscan.io",
             aliases=("arb", "arbitrum-one"),
@@ -57,7 +57,7 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://base-rpc.publicnode.com",
                 "https://mainnet.base.org",
-                "https://1rpc.io/base",
+                "https://base.drpc.org",
             ),
             explorer="https://basescan.org",
         ),
@@ -70,6 +70,7 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://optimism-rpc.publicnode.com",
                 "https://mainnet.optimism.io",
+                "https://optimism.drpc.org",
                 "https://1rpc.io/op",
             ),
             explorer="https://optimistic.etherscan.io",
@@ -83,7 +84,7 @@ NETWORKS: dict[str, Network] = {
             native_coingecko_id="polygon-ecosystem-token",
             rpc_urls=(
                 "https://polygon-bor-rpc.publicnode.com",
-                "https://polygon-rpc.com",
+                "https://polygon.drpc.org",
                 "https://1rpc.io/matic",
             ),
             explorer="https://polygonscan.com",
@@ -98,6 +99,8 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://bsc-rpc.publicnode.com",
                 "https://bsc-dataseed.bnbchain.org",
+                "https://bsc-dataseed1.bnbchain.org",
+                "https://56.rpc.thirdweb.com",
                 "https://1rpc.io/bnb",
             ),
             explorer="https://bscscan.com",
@@ -112,6 +115,7 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://avalanche-c-chain-rpc.publicnode.com",
                 "https://api.avax.network/ext/bc/C/rpc",
+                "https://avalanche.drpc.org",
                 "https://1rpc.io/avax/c",
             ),
             explorer="https://snowscan.xyz",
@@ -126,6 +130,7 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://gnosis-rpc.publicnode.com",
                 "https://rpc.gnosischain.com",
+                "https://gnosis.drpc.org",
             ),
             explorer="https://gnosisscan.io",
             aliases=("xdai", "gno"),
@@ -139,6 +144,7 @@ NETWORKS: dict[str, Network] = {
             rpc_urls=(
                 "https://unichain-rpc.publicnode.com",
                 "https://mainnet.unichain.org",
+                "https://unichain.drpc.org",
             ),
             explorer="https://uniscan.xyz",
             aliases=("uni-chain",),
@@ -149,7 +155,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=59144,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://linea-rpc.publicnode.com", "https://rpc.linea.build"),
+            rpc_urls=(
+                "https://linea-rpc.publicnode.com",
+                "https://rpc.linea.build",
+                "https://linea.drpc.org",
+            ),
             explorer="https://lineascan.build",
         ),
         Network(
@@ -158,7 +168,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=534352,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://scroll-rpc.publicnode.com", "https://rpc.scroll.io"),
+            rpc_urls=(
+                "https://scroll-rpc.publicnode.com",
+                "https://rpc.scroll.io",
+                "https://scroll.drpc.org",
+            ),
             explorer="https://scrollscan.com",
         ),
         Network(
@@ -167,7 +181,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=324,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://mainnet.era.zksync.io",),
+            rpc_urls=(
+                "https://mainnet.era.zksync.io",
+                "https://zksync.drpc.org",
+                "https://1rpc.io/zksync2-era",
+            ),
             explorer="https://era.zksync.network",
             aliases=("zksync-era", "era"),
         ),
@@ -177,7 +195,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=5000,
             native_symbol="MNT",
             native_coingecko_id="mantle",
-            rpc_urls=("https://mantle-rpc.publicnode.com", "https://rpc.mantle.xyz"),
+            rpc_urls=(
+                "https://mantle-rpc.publicnode.com",
+                "https://rpc.mantle.xyz",
+                "https://mantle.drpc.org",
+            ),
             explorer="https://mantlescan.xyz",
             aliases=("mnt",),
         ),
@@ -187,7 +209,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=81457,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://blast-rpc.publicnode.com", "https://rpc.blast.io"),
+            rpc_urls=(
+                "https://blast-rpc.publicnode.com",
+                "https://rpc.blast.io",
+                "https://blast.drpc.org",
+            ),
             explorer="https://blastscan.io",
         ),
         Network(
@@ -196,7 +222,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=146,
             native_symbol="S",
             native_coingecko_id="sonic-3",
-            rpc_urls=("https://sonic-rpc.publicnode.com", "https://rpc.soniclabs.com"),
+            rpc_urls=(
+                "https://sonic-rpc.publicnode.com",
+                "https://rpc.soniclabs.com",
+                "https://sonic.drpc.org",
+            ),
             explorer="https://sonicscan.org",
             aliases=("s",),
         ),
@@ -206,7 +236,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=80094,
             native_symbol="BERA",
             native_coingecko_id="berachain-bera",
-            rpc_urls=("https://berachain-rpc.publicnode.com", "https://rpc.berachain.com"),
+            rpc_urls=(
+                "https://berachain-rpc.publicnode.com",
+                "https://rpc.berachain.com",
+                "https://berachain.drpc.org",
+            ),
             explorer="https://berascan.com",
             aliases=("bera",),
         ),
@@ -216,7 +250,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=480,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://worldchain-mainnet.g.alchemy.com/public",),
+            rpc_urls=(
+                "https://worldchain-mainnet.g.alchemy.com/public",
+                "https://worldchain-mainnet.gateway.tenderly.co",
+                "https://worldchain.drpc.org",
+            ),
             explorer="https://worldscan.org",
             aliases=("world",),
         ),
@@ -226,7 +264,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=57073,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://rpc-gel.inkonchain.com",),
+            rpc_urls=(
+                "https://rpc-gel.inkonchain.com",
+                "https://rpc-qnd.inkonchain.com",
+                "https://ink.drpc.org",
+            ),
             explorer="https://explorer.inkonchain.com",
         ),
         Network(
@@ -235,7 +277,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=1868,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://soneium-rpc.publicnode.com", "https://rpc.soneium.org"),
+            rpc_urls=(
+                "https://soneium-rpc.publicnode.com",
+                "https://rpc.soneium.org",
+                "https://soneium.drpc.org",
+            ),
             explorer="https://soneium.blockscout.com",
         ),
         Network(
@@ -244,7 +290,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=42220,
             native_symbol="CELO",
             native_coingecko_id="celo",
-            rpc_urls=("https://celo-rpc.publicnode.com", "https://forno.celo.org"),
+            rpc_urls=(
+                "https://celo-rpc.publicnode.com",
+                "https://forno.celo.org",
+                "https://1rpc.io/celo",
+            ),
             explorer="https://celoscan.io",
         ),
         Network(
@@ -253,7 +303,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=1329,
             native_symbol="SEI",
             native_coingecko_id="sei-network",
-            rpc_urls=("https://sei-evm-rpc.publicnode.com", "https://evm-rpc.sei-apis.com"),
+            rpc_urls=(
+                "https://sei-evm-rpc.publicnode.com",
+                "https://evm-rpc.sei-apis.com",
+                "https://1329.rpc.thirdweb.com",
+            ),
             explorer="https://seitrace.com",
         ),
         Network(
@@ -262,7 +316,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=999,
             native_symbol="HYPE",
             native_coingecko_id="hyperliquid",
-            rpc_urls=("https://rpc.hyperliquid.xyz/evm",),
+            rpc_urls=(
+                "https://rpc.hyperliquid.xyz/evm",
+                "https://hyperliquid.drpc.org",
+                "https://hyperliquid-json-rpc.stakely.io",
+            ),
             explorer="https://hyperevmscan.io",
             aliases=("hyper", "hype"),
         ),
@@ -272,7 +330,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=143,
             native_symbol="MON",
             native_coingecko_id="monad",
-            rpc_urls=("https://rpc.monad.xyz",),
+            rpc_urls=(
+                "https://rpc.monad.xyz",
+                "https://rpc-mainnet.monadinfra.com",
+                "https://143.rpc.thirdweb.com",
+            ),
             explorer="https://monadexplorer.com",
             aliases=("mon",),
         ),
@@ -282,7 +344,10 @@ NETWORKS: dict[str, Network] = {
             chain_id=9745,
             native_symbol="XPL",
             native_coingecko_id="plasma",
-            rpc_urls=("https://rpc.plasma.to",),
+            rpc_urls=(
+                "https://rpc.plasma.to",
+                "https://9745.rpc.thirdweb.com",
+            ),
             explorer="https://plasmascan.to",
             aliases=("xpl",),
         ),
@@ -292,7 +357,11 @@ NETWORKS: dict[str, Network] = {
             chain_id=747474,
             native_symbol="ETH",
             native_coingecko_id="ethereum",
-            rpc_urls=("https://rpc.katana.network",),
+            rpc_urls=(
+                "https://rpc.katana.network",
+                "https://rpc.katanarpc.com",
+                "https://katana.drpc.org",
+            ),
             explorer="https://explorer.katanarpc.com",
         ),
         Network(
@@ -316,6 +385,7 @@ NETWORKS: dict[str, Network] = {
             native_coingecko_id="solana",
             rpc_urls=(
                 "https://api.mainnet-beta.solana.com",
+                "https://api.mainnet.solana.com",
                 "https://solana-rpc.publicnode.com",
             ),
             explorer="https://solscan.io",

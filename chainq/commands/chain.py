@@ -363,7 +363,7 @@ def tx(
     if receipt is None:
         status = "pending"
     else:
-        status = "success" if receipt["status"] == 1 else "failed"
+        status = "success" if receipt.get("status", 1) == 1 else "failed"
     value = Decimal(transaction["value"]) / Decimal(10**18)
     fee = None
     if receipt is not None:

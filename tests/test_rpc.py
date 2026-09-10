@@ -1,3 +1,5 @@
+import pytest
+
 from chainq.rpc import decode_address, decode_string, decode_uint, encode_erc20, encode_get_eth_balance
 
 HOLDER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
@@ -70,3 +72,45 @@ def test_multicall_chunks_and_halves_on_failure(monkeypatch):
     calls = [("0x" + "ab" * 20, b"\x00")] * 1000
     assert rpc.multicall(None, calls) == [b"\x01"] * 1000
     assert seen == [1000, 500, 250, 250, 500, 250, 250]
+
+
+def test_fallback_provider_skips_failing_endpoints(monkeypatch):
+    from chainq.rpc import FallbackProvider
+
+    calls: list[tuple[str, str]] = []
+
+    def fake_make_request(self, method, params):
+        calls.append((self.endpoint_uri, method))
+        if "bad" in self.endpoint_uri:
+            raise RuntimeError("HTTP 403")
+        if "wrong" in self.endpoint_uri:
+            return {"jsonrpc": "2.0", "id": 1, "result": "0x2"}
+        if "limited" in self.endpoint_uri and method == "eth_call":
+            return {"jsonrpc": "2.0", "id": 1, "error": {"code": -32005, "message": "rate limit exceeded"}}
+        return {"jsonrpc": "2.0", "id": 1, "result": "0x1"}
+
+    monkeypatch.setattr("chainq.rpc.HTTPProvider.make_request", fake_make_request)
+    provider = FallbackProvider(["https://bad", "https://wrong", "https://limited", "https://good"], 1)
+
+    assert provider.make_request("eth_blockNumber", [])["result"] == "0x1"
+    assert provider.url == "https://limited"
+    assert provider.make_request("eth_call", [{}])["result"] == "0x1"
+    assert provider.url == "https://good"
+    assert provider.make_request("eth_blockNumber", [])["result"] == "0x1"
+    assert provider.url == "https://good"
+    assert 1 in provider.dead
+    assert ("https://good", "eth_chainId") in calls
+    assert calls.count(("https://good", "eth_chainId")) == 1
+
+
+def test_fallback_provider_reports_every_failure(monkeypatch):
+    from chainq.errors import ChainqError
+    from chainq.rpc import FallbackProvider
+
+    def fake_make_request(self, method, params):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("chainq.rpc.HTTPProvider.make_request", fake_make_request)
+    provider = FallbackProvider(["https://a", "https://b"], 1)
+    with pytest.raises(ChainqError, match=r"https://a \(RuntimeError\); https://b \(RuntimeError\)"):
+        provider.make_request("eth_blockNumber", [])
