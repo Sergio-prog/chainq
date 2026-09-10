@@ -2,10 +2,18 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.20.2
+
+### Fixes
+- per-request RPC failover and verified endpoint registry
+
 ## v0.20.1
 
 ### Fixes
 - add DexScreener mapping for Robinhood Chain
+
+### Documentation
+- regenerate release references for v0.20.1
 
 ## v0.20.0
 
