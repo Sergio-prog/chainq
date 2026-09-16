@@ -70,6 +70,11 @@ TOKENS: dict[str, dict[str, str]] = {
         "usdc": "0x078D782b760474a361dDA0AF3839290b0EF57AD6",
         "weth": "0x4200000000000000000000000000000000000006",
     },
+    "arc": {
+        "usdc": "0x3600000000000000000000000000000000000000",
+        "weth": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+        "eurc": "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1",
+    },
 }
 
 SOLANA_TOKENS: dict[str, str] = {

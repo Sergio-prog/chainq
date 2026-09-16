@@ -69,6 +69,7 @@ CHAIN_SLUGS = {
     "plasma": "plasma",
     "katana": "katana",
     "robinhood": "robinhood",
+    "arc": "arc",
 }
 
 V2_FACTORY_ABI = [

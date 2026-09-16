@@ -132,13 +132,12 @@ def price(
     for query in assets:
         if coingecko.is_address(query) or coingecko.is_solana_mint(query):
             coin, best_pair = _locate_contract(query, network_key)
-            if coin:
-                entries.append((query, coin["id"], None))
-                ids.append(coin["id"])
-            elif best_pair is not None:
-                entries.append((query, None, _dexscreener_price_row(query, best_pair)))
-            else:
+            if coin is None and best_pair is None:
                 raise ChainqError(f"no asset found for contract {query} on CoinGecko or DexScreener")
+            fallback = _dexscreener_price_row(query, best_pair) if best_pair is not None else None
+            entries.append((query, coin["id"] if coin else None, fallback))
+            if coin:
+                ids.append(coin["id"])
         else:
             coin_id = coingecko.resolve_id(query)
             entries.append((query, coin_id, None))
@@ -146,7 +145,8 @@ def price(
     rows = {m["id"]: m for m in coingecko.markets(ids)} if ids else {}
     data, lines, quiet_values, verbose_lines = [], [], [], []
     for query, coin_id, fallback in entries:
-        if fallback is not None:
+        m = rows.get(coin_id)
+        if fallback is not None and (m is None or m.get("current_price") is None):
             data.append(fallback)
             line = f"{dim(f'{fallback["symbol"].upper()} ({fallback["name"]}):')} " \
                 f"{fmt_usd(fallback['price_usd'] or 0)}  {dim('24h')} {fmt_pct(fallback['change_24h_pct'])}"
@@ -156,8 +156,7 @@ def price(
             quiet_values.append(str(fallback["price_usd"]))
             verbose_lines.append(f"{fallback['symbol'].upper()}: contract {query}, best pair by liquidity [dexscreener]")
             continue
-        m = rows.get(coin_id)
-        if m is None:
+        if m is None or m.get("current_price") is None:
             raise ChainqError(f"no market data for '{query}' (resolved to '{coin_id}')")
         change_24h = m.get("price_change_percentage_24h")
         change_7d = m.get("price_change_percentage_7d_in_currency")

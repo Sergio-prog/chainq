@@ -14,6 +14,7 @@ class Network:
     explorer: str
     aliases: tuple[str, ...] = ()
     kind: str = "evm"
+    native_erc20: str | None = None
 
 
 NETWORKS: dict[str, Network] = {
@@ -376,6 +377,23 @@ NETWORKS: dict[str, Network] = {
             ),
             explorer="https://robinhoodchain.blockscout.com",
             aliases=("rh", "robinhood-chain"),
+        ),
+        Network(
+            key="arc",
+            name="Arc",
+            chain_id=5042,
+            native_symbol="USDC",
+            native_coingecko_id="usd-coin",
+            rpc_urls=(
+                "https://rpc.blockdaemon.mainnet.arc.io",
+                "https://rpc.drpc.mainnet.arc.io",
+                "https://5042.rpc.thirdweb.com",
+                "https://deploydollars.com/api/rpc",
+                "https://arc.argus.vip/api/arc-rpc",
+            ),
+            explorer="https://explorer.arc.io",
+            aliases=("arc-mainnet",),
+            native_erc20="0x3600000000000000000000000000000000000000",
         ),
         Network(
             key="solana",

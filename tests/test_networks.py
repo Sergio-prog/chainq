@@ -7,6 +7,7 @@ from chainq.networks import NETWORKS, resolve_network
 def test_resolve_by_key():
     assert resolve_network("ethereum").chain_id == 1
     assert resolve_network("robinhood").chain_id == 4663
+    assert resolve_network("arc").chain_id == 5042
 
 
 def test_resolve_by_alias():
@@ -15,11 +16,13 @@ def test_resolve_by_alias():
     assert resolve_network("matic").key == "polygon"
     assert resolve_network("rh").key == "robinhood"
     assert resolve_network("robinhood-chain").key == "robinhood"
+    assert resolve_network("arc-mainnet").key == "arc"
 
 
 def test_resolve_by_chain_id():
     assert resolve_network("8453").key == "base"
     assert resolve_network("4663").key == "robinhood"
+    assert resolve_network("5042").key == "arc"
 
 
 def test_unknown_network():

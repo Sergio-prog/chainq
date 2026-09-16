@@ -28,6 +28,8 @@ def _scan_evm_legacy(client, net, address: str) -> list[dict]:
             }
         )
     for symbol, token_address in TOKENS.get(net.key, {}).items():
+        if token_address == net.native_erc20:
+            continue
         contract = erc20(client, token_address)
         raw = contract.functions.balanceOf(address).call()
         if not raw:
@@ -66,6 +68,8 @@ def _scan_evm(net_key: str, address: str) -> list[dict]:
             }
         )
     for row in rows:
+        if row["token_address"] == net.native_erc20:
+            continue
         token = row["catalog"]
         assets.append(
             {

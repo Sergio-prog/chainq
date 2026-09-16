@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - prices (spot, historical, OHLC candles), wallet balances and portfolios on 26 EVM networks + Solana, gas, transactions, raw RPC, address inspection (EOA/contract/proxy/program), lending and yield rates (Aave, Morpho, Kamino, Pendle, Sky, Ethena, Lido), DEX pools and stats (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps/funding/prediction markets, NFT floors (OpenSea), stablecoin mcaps and pegs, and DefiLlama TVL/fees for any protocol. Use for any question about crypto prices or history, token/wallet balances, gas costs, a transaction hash, onchain state, what an address is, lending/borrowing rates, vault or staking yields, DEX pools, TVL, funding rates, prediction markets, NFT floors, or stablecoins.
+description: Query live crypto and onchain data via the chainq CLI - prices (spot, historical, OHLC candles), wallet balances and portfolios on 27 EVM networks + Solana, gas, transactions, raw RPC, address inspection (EOA/contract/proxy/program), lending and yield rates (Aave, Morpho, Kamino, Pendle, Sky, Ethena, Lido), DEX pools and stats (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps/funding/prediction markets, NFT floors (OpenSea), stablecoin mcaps and pegs, and DefiLlama TVL/fees for any protocol. Use for any question about crypto prices or history, token/wallet balances, gas costs, a transaction hash, onchain state, what an address is, lending/borrowing rates, vault or staking yields, DEX pools, TVL, funding rates, prediction markets, NFT floors, or stablecoins.
 ---
 
 # chainq
@@ -80,7 +80,7 @@ chainq etf eth --json              # ETH ETF flows as structured JSON
 
 ## Onchain (EVM + Solana)
 
-26 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood) plus solana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype, rh, sol...), or chain ids. Default is ethereum. `chainq networks` lists all.
+27 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc) plus solana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype, rh, sol...), or chain ids. Default is ethereum. `chainq networks` lists all.
 
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
