@@ -2,10 +2,18 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.21.0
+
+### Features
+- add Arc mainnet network
+
 ## v0.20.2
 
 ### Fixes
 - per-request RPC failover and verified endpoint registry
+
+### Documentation
+- regenerate release references for v0.20.2
 
 ## v0.20.1
 
