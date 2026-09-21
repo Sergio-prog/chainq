@@ -2,10 +2,18 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.22.0
+
+### Features
+- add Lighter spot markets and account balances
+
 ## v0.21.0
 
 ### Features
 - add Arc mainnet network
+
+### Documentation
+- regenerate release references for v0.21.0
 
 ## v0.20.2
 
