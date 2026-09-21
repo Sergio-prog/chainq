@@ -9,7 +9,7 @@ from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
-from chainq.providers import coingecko, hyperliquid
+from chainq.providers import coingecko, hyperliquid, lighter
 from chainq.rpc import connect, erc20, resolve_address, sweep_catalog
 from chainq.tokens import TOKENS
 
@@ -171,6 +171,45 @@ def _scan_hyperliquid(address: str) -> list[dict]:
     return assets
 
 
+def _scan_lighter(address: str) -> list[dict]:
+    try:
+        acc = lighter.account(address)
+        balances = lighter.asset_balances(acc)
+    except Exception:
+        return []
+    assets: list[dict] = []
+    equity = float(acc.get("total_asset_value") or 0)
+    if equity:
+        assets.append(
+            {
+                "network": "lighter",
+                "symbol": "perp equity (USDC)",
+                "token_address": None,
+                "amount": str(equity),
+                "price_usd": 1.0,
+                "price_source": "lighter",
+                "value_usd": equity,
+            }
+        )
+    for b in balances:
+        amount = b["total"] - (b["margin"] if b["coin"] == "USDC" else 0)
+        if not amount:
+            continue
+        price = b["price_usd"]
+        assets.append(
+            {
+                "network": "lighter",
+                "symbol": b["coin"],
+                "token_address": None,
+                "amount": str(amount),
+                "price_usd": price,
+                "price_source": "lighter" if price is not None else None,
+                "value_usd": amount * price if price is not None else None,
+            }
+        )
+    return assets
+
+
 def _resolve_scan_target(address: str, networks: list[str] | None) -> tuple[str, list[str]]:
     value = address.strip()
     if solana.looks_like_solana(value):
@@ -202,7 +241,7 @@ def portfolio(
         bool, typer.Option("--hide-unpriced", help="drop unpriced assets even with --all (default without --all)")
     ] = False,
     defi: Annotated[
-        bool, typer.Option("--defi", help="also fold in Hyperliquid perp equity and spot balances")
+        bool, typer.Option("--defi", help="also fold in Hyperliquid and Lighter perp equity and spot balances")
     ] = False,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -224,6 +263,7 @@ def portfolio(
     assets = pricing.price_assets(assets)
     if defi and addr.startswith("0x"):
         assets.extend(_scan_hyperliquid(addr))
+        assets.extend(_scan_lighter(addr))
     kept = []
     hidden = 0
     for a in assets:
@@ -268,7 +308,7 @@ def portfolio(
         quiet_value=total,
         verbose_lines=[
             f"scanned {len(keys)} network(s), {sum(len(catalog.tokens_for(k)) for k in keys):,} catalog tokens"
-            + (" + Hyperliquid" if defi else ""),
+            + (" + Hyperliquid + Lighter" if defi else ""),
             f"address: {addr}",
         ],
     )

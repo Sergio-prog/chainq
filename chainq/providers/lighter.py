@@ -47,6 +47,60 @@ def markets() -> list[dict]:
     return rows
 
 
+def spot_markets() -> list[dict]:
+    details = _get("/orderBookDetails").get("spot_order_book_details") or []
+    rows = []
+    for m in details:
+        if m.get("status") != "active":
+            continue
+        base, _, quote = (m.get("symbol") or "").partition("/")
+        rows.append(
+            {
+                "pair": m.get("symbol"),
+                "base": base,
+                "quote": quote,
+                "market_id": m.get("market_id"),
+                "last_price": float(m.get("last_trade_price") or 0),
+                "change_24h_pct": float(m.get("daily_price_change") or 0),
+                "volume_24h_usd": float(m.get("daily_quote_token_volume") or 0),
+                "high_24h": float(m.get("daily_price_high") or 0),
+                "low_24h": float(m.get("daily_price_low") or 0),
+                "trades_24h": m.get("daily_trades_count"),
+            }
+        )
+    return rows
+
+
+def asset_prices() -> dict[str, float]:
+    details = _get("/assetDetails").get("asset_details") or []
+    return {a["symbol"]: float(a["index_price"]) for a in details if float(a.get("index_price") or 0)}
+
+
+def asset_balances(acc: dict) -> list[dict]:
+    prices = asset_prices()
+    rows = []
+    for a in acc.get("assets") or []:
+        available = float(a.get("balance") or 0)
+        locked = float(a.get("locked_balance") or 0)
+        margin = float(a.get("margin_balance") or 0)
+        total = available + locked + margin
+        if total == 0:
+            continue
+        price = prices.get(a.get("symbol"))
+        rows.append(
+            {
+                "coin": a.get("symbol"),
+                "available": available,
+                "locked": locked,
+                "margin": margin,
+                "total": total,
+                "price_usd": price,
+                "value_usd": total * price if price is not None else None,
+            }
+        )
+    return sorted(rows, key=lambda r: r["value_usd"] or 0, reverse=True)
+
+
 def funding_rates() -> dict[str, float]:
     rates = _get("/funding-rates").get("funding_rates") or []
     return {r["symbol"]: float(r["rate"]) for r in rates if r.get("exchange") == "lighter"}

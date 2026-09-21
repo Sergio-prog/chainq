@@ -3,12 +3,14 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
-from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
+from chainq.fmt import dim, fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import lighter
 from chainq.rpc import resolve_address
 
-app = typer.Typer(no_args_is_help=True, help="Lighter public market data (perps).")
+app = typer.Typer(no_args_is_help=True, help="Lighter public market data (perps, spot).")
+spot_app = typer.Typer(no_args_is_help=True, help="Lighter spot markets and balances.")
+app.add_typer(spot_app, name="spot")
 
 SORT_KEYS = {
     "volume": lambda m: m["volume_24h_usd"],
@@ -167,3 +169,101 @@ def positions(
         "positions": positions_data,
     }
     out.emit(data, lines, quiet_value=total)
+
+
+def _spot_line(m: dict) -> str:
+    return (
+        f"{m['pair']} (spot): {fmt_usd(m['last_price'])}  24h {fmt_pct(m['change_24h_pct'])}  "
+        f"vol {humanize_usd(m['volume_24h_usd'])}"
+    )
+
+
+def _find_spot(markets: list[dict], coins: list[str]) -> list[dict]:
+    selected = []
+    for coin in coins:
+        needle = coin.upper()
+        match = next((m for m in markets if needle in (m["pair"].upper(), m["base"].upper())), None)
+        if match is None:
+            raise ChainqError(f"no Lighter spot market for '{coin}'")
+        selected.append(match)
+    return selected
+
+
+@spot_app.command(name="price")
+def spot_price(
+    coins: Annotated[list[str], typer.Argument(help="spot tokens or pairs, e.g. ETH LIT/USDC")],
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Last price, 24h change, and volume for Lighter spot pairs."""
+    out = Out(json_out, quiet, verbose, format)
+    selected = _find_spot(lighter.spot_markets(), coins)
+    out.emit(
+        selected,
+        [_spot_line(m) for m in selected],
+        quiet_value="\n".join(str(m["last_price"]) for m in selected),
+        verbose_lines=[
+            f"{m['pair']}: market id {m['market_id']}, 24h range {fmt_usd(m['low_24h'])} - {fmt_usd(m['high_24h'])}, "
+            f"24h trades {m['trades_24h']}"
+            for m in selected
+        ],
+    )
+
+
+@spot_app.command(name="markets")
+def spot_markets(
+    limit: Annotated[int, typer.Option("--limit", "-l")] = 15,
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Lighter spot markets by 24h volume."""
+    out = Out(json_out, quiet, verbose, format)
+    ranked = sorted(lighter.spot_markets(), key=lambda m: m["volume_24h_usd"], reverse=True)[:limit]
+    out.emit(ranked, [_spot_line(m) for m in ranked], quiet_value="\n".join(m["pair"] for m in ranked))
+
+
+@spot_app.command(name="balances")
+def spot_balances(
+    address: Annotated[str, typer.Argument(help="L1 account address (0x...)")],
+    min_usd: Annotated[float, typer.Option("--min-usd", help="hide balances worth less than this")] = 0,
+    json_out: JsonOpt = False,
+    quiet: QuietOpt = False,
+    verbose: VerboseOpt = False,
+    format: FormatOpt = "text",
+):
+    """Asset balances (available, in orders, margin) with USD values for an account."""
+    out = Out(json_out, quiet, verbose, format)
+    addr = resolve_address(address)
+    acc = lighter.account(addr)
+    rows = [r for r in lighter.asset_balances(acc) if r["value_usd"] is None or r["value_usd"] >= min_usd]
+    total_usd = sum(r["value_usd"] or 0 for r in rows)
+    lines = [f"Lighter balances {short_addr(addr)}: ~{fmt_usd(total_usd)} across {len(rows)} assets"]
+    width = max((len(r["coin"]) for r in rows), default=0)
+    for r in rows:
+        buckets = ", ".join(
+            f"{label} {fmt_amount(r[key])}"
+            for key, label in (("available", "available"), ("locked", "in orders"), ("margin", "margin"))
+            if r[key]
+        )
+        value = f" (~{fmt_usd(r['value_usd'])})" if r["value_usd"] is not None else ""
+        lines.append(f"  {r['coin']:<{width}}: {fmt_amount(r['total'])}{value}  {dim(buckets)}")
+    if not rows:
+        lines.append("  no balances")
+    out.emit(
+        {
+            "address": addr,
+            "account_index": acc.get("account_index"),
+            "total_value_usd": total_usd,
+            "balances": rows,
+        },
+        lines,
+        quiet_value=total_usd,
+        verbose_lines=[
+            "margin = perp collateral held in that asset; USDC margin is the collateral shown by `lighter positions`",
+            "prices: Lighter asset index prices",
+        ],
+    )

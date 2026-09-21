@@ -87,7 +87,7 @@ chainq balance vitalik.eth                                    # native balance, 
 chainq portfolio vitalik.eth                                  # sweep ALL networks: native + every catalog token, USD total
 chainq portfolio 0x... -n ethereum -n base --min-usd 10       # restrict networks, raise the dust floor (default $1)
 chainq portfolio 0x... --all                                  # also show unpriced tokens and dust (hidden by default)
-chainq portfolio 0x... --defi                                 # fold in Hyperliquid perp equity + spot balances
+chainq portfolio 0x... --defi                                 # fold in Hyperliquid + Lighter perp equity and spot balances
 chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol (curated, then the catalog)
 chainq balance 0x... --coin basecat -n base                   # any catalog symbol works; ambiguous symbols error with candidates
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
@@ -247,16 +247,19 @@ chainq nft top -s volume -l 10             # top collections; sort: volume | 7d-
 
 Collections are addressed by OpenSea slug (the last part of an opensea.io/collection/... URL). `floor` and `collection` need no API key for well-known collections; `nft top` and long-tail slugs require one (`chainq config set opensea-api-key <key>`).
 
-## Lighter (public data, perps)
+## Lighter (public data, perps + spot)
 
 ```bash
 chainq protocols lighter markets -l 10 -s oi   # perp markets: last price, 24h change, volume, OI, funding
 chainq protocols lighter price BTC ETH
 chainq protocols lighter funding               # hourly funding + APR
 chainq protocols lighter positions 0xADDRESS   # account value, collateral, open positions
+chainq protocols lighter spot markets          # spot pairs: last price, 24h change, volume
+chainq protocols lighter spot price ETH LIT/USDC
+chainq protocols lighter spot balances 0xADDRESS --min-usd 1   # asset balances with USD values
 ```
 
-Funding is shown as hourly rate and annualized APR; negative funding means shorts pay longs.
+Funding is shown as hourly rate and annualized APR; negative funding means shorts pay longs. `spot balances` is the full view of what an address holds on Lighter: each asset splits into `available`, `locked` (in open spot orders), and `margin` (perp collateral held in that asset), priced at Lighter index prices. USDC `margin` is the same collateral `positions` reports, so do not add the two; `positions` account value excludes spot holdings and non-USDC margin.
 
 ## Recipes
 

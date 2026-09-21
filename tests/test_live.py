@@ -22,6 +22,7 @@ SMOKE = {
     "hyperliquid": ["protocols", "hl", "markets"],
     "hyperliquid-funding-history": ["protocols", "hl", "funding", "BTC", "--history"],
     "lighter": ["protocols", "lighter", "markets"],
+    "lighter-spot": ["protocols", "lighter", "spot", "markets"],
     "aave": ["protocols", "aave", "markets"],
     "morpho": ["protocols", "morpho", "vaults"],
     "kamino": ["protocols", "kamino", "markets", "-l", "3"],

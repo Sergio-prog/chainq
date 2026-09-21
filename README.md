@@ -124,7 +124,7 @@ chainq balance 0x... --coin basecat -n base           # any symbol in the token 
 chainq balance 9WzDX... -n solana --coin usdc         # SOL and SPL token balances
 chainq portfolio vitalik.eth                          # all networks: native + every catalog token, USD total, spam hidden
 chainq portfolio 9WzDX...                             # Solana wallets: SOL + every priced catalog mint
-chainq portfolio 0x... --defi --all                   # fold in Hyperliquid perp+spot; show dust and unpriced too
+chainq portfolio 0x... --defi --all                   # fold in Hyperliquid + Lighter perp+spot; show dust and unpriced too
 chainq tokens search cat -n base                      # find tokens by symbol/name; status/refresh manage the daily cache
 chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
 chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
@@ -237,6 +237,9 @@ chainq protocols lighter markets -s oi            # perp markets: last price, vo
 chainq protocols lighter price BTC ETH            # single markets
 chainq protocols lighter funding                  # funding rates (hourly + APR)
 chainq protocols lighter positions 0xADDRESS      # account value, collateral, open positions
+chainq protocols lighter spot markets             # spot pairs: last price, 24h change, volume
+chainq protocols lighter spot price ETH LIT/USDC  # single spot pairs
+chainq protocols lighter spot balances 0xADDRESS  # asset balances (available / in orders / margin) with USD values
 ```
 
 ## Configuration
