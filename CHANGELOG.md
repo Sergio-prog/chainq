@@ -2,10 +2,18 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.22.1
+
+### Fixes
+- return every ERC-20 transfer in tx --json output
+
 ## v0.22.0
 
 ### Features
 - add Lighter spot markets and account balances
+
+### Documentation
+- regenerate release references for v0.22.0
 
 ## v0.21.0
 
