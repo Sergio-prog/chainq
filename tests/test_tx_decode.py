@@ -67,13 +67,12 @@ def test_empty_data_guard(monkeypatch):
     assert rows[0]["amount"] == 0.0
 
 
-def test_caps_at_ten_transfers_with_count_row(monkeypatch):
+def test_decodes_every_transfer_without_note_row(monkeypatch):
     monkeypatch.setattr(chain, "_token_metadata", _fake_metadata)
-    logs = [_transfer_log(amount=i + 1) for i in range(12)]
+    logs = [_transfer_log(amount=i + 1) for i in range(17)]
     rows = chain._decode_transfers(None, {"logs": logs})
-    assert len(rows) == 11
-    assert all("note" not in row for row in rows[:10])
-    assert rows[10] == {"note": "+2 more"}
+    assert len(rows) == 17
+    assert all("note" not in row for row in rows)
 
 
 def test_unknown_token_metadata_falls_back_to_short_address(monkeypatch):

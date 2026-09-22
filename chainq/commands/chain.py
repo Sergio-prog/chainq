@@ -304,18 +304,19 @@ def _token_metadata(client, addresses: list[str]) -> dict[str, tuple[str | None,
     return memo
 
 
+TEXT_TRANSFER_LIMIT = 10
+
+
 def _decode_transfers(client, receipt) -> list[dict]:
     logs = [log for log in receipt["logs"] if len(log["topics"]) == 3 and log["topics"][0] == TRANSFER_TOPIC]
     if not logs:
         return []
-    shown = logs[:10]
-    extra = len(logs) - len(shown)
     try:
-        metadata = _token_metadata(client, sorted({log["address"] for log in shown}))
+        metadata = _token_metadata(client, sorted({log["address"] for log in logs}))
     except Exception:
         metadata = {}
     rows = []
-    for log in shown:
+    for log in logs:
         token = log["address"]
         symbol, decimals = metadata.get(token, (None, None))
         raw = decode_uint(log["data"]) if log["data"] else 0
@@ -329,8 +330,6 @@ def _decode_transfers(client, receipt) -> list[dict]:
                 "to": decode_address(log["topics"][2]),
             }
         )
-    if extra:
-        rows.append({"note": f"+{extra} more"})
     return rows
 
 
@@ -410,15 +409,14 @@ def tx(
     ]
     if function_name:
         lines.append(f"  calls {function_name}")
-    transfer_rows = [row for row in token_transfers if "note" not in row]
-    if transfer_rows:
+    if token_transfers:
         lines.append("  transfers:")
-        for row in transfer_rows:
+        for row in token_transfers[:TEXT_TRANSFER_LIMIT]:
             arrow = f"{short_addr(row['from'])} → {short_addr(row['to'])}"
             lines.append(f"    {fmt_amount(row['amount'])} {row['symbol']}: {arrow}")
-        extra_note = next((row["note"] for row in token_transfers if "note" in row), None)
-        if extra_note:
-            lines.append(f"    … {extra_note} transfers")
+        hidden = len(token_transfers) - TEXT_TRANSFER_LIMIT
+        if hidden > 0:
+            lines.append(f"    … +{hidden} more transfers (--json lists all)")
     if data["block"] is not None:
         when = f" at {timestamp.strftime('%Y-%m-%d %H:%M UTC')}" if timestamp else ""
         lines.append(f"  block {data['block']}{when}")
