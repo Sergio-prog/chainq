@@ -1,12 +1,15 @@
+import io
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Annotated
 
 import typer
+from rich.console import Console, RenderableType
+from rich.measure import Measurement
 
 from chainq.errors import ChainqError
-from chainq.fmt import dim, fmt_amount
+from chainq.fmt import color_enabled, dim, fmt_amount
 
 FORMATS = ("text", "json", "table", "toon")
 
@@ -23,6 +26,15 @@ def dim_label(line: str) -> str:
     if idx <= 0 or "\033" in line[:idx]:
         return line
     return dim(line[: idx + 1]) + line[idx + 1 :]
+
+
+def render_rich(renderable: RenderableType) -> list[str]:
+    color = color_enabled()
+    console = Console(file=io.StringIO(), width=10_000, force_terminal=color, no_color=not color, highlight=False)
+    width = Measurement.get(console, console.options, renderable).maximum
+    console = Console(file=io.StringIO(), width=width, force_terminal=color, no_color=not color, highlight=False)
+    console.print(renderable)
+    return [line.rstrip() for line in console.file.getvalue().splitlines()]
 
 
 def _is_rows(value: object) -> bool:
@@ -50,15 +62,18 @@ def render_table(rows: list[dict]) -> str:
             if key not in columns:
                 columns.append(key)
     grid = [[_cell(row.get(col)) for col in columns] for row in rows]
+
     def _is_num(value: object) -> bool:
         return isinstance(value, int | float) and not isinstance(value, bool)
 
     numeric = [all(_is_num(row.get(col)) for row in rows if row.get(col) is not None) for col in columns]
     widths = [max(len(col), *(len(line[i]) for line in grid)) for i, col in enumerate(columns)]
+
     def fmt_row(cells: list[str]) -> str:
         return "  ".join(
             cells[i].rjust(widths[i]) if numeric[i] else cells[i].ljust(widths[i]) for i in range(len(columns))
         ).rstrip()
+
     lines = [fmt_row(list(columns)), "  ".join("-" * w for w in widths)]
     lines.extend(fmt_row(line) for line in grid)
     return "\n".join(lines)

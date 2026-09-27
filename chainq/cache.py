@@ -32,10 +32,22 @@ def get(key: str) -> object | None:
     return None
 
 
+def get_many(keys: list[str]) -> dict[str, object]:
+    now = time.time()
+    data = _load()
+    return {k: data[k]["value"] for k in keys if k in data and data[k].get("expires_at", 0) > now}
+
+
 def put(key: str, value: object, ttl: float) -> None:
+    put_many({key: value}, ttl)
+
+
+def put_many(values: dict[str, object], ttl: float) -> None:
+    if not values:
+        return
     now = time.time()
     data = {k: v for k, v in _load().items() if v.get("expires_at", 0) > now}
-    data[key] = {"expires_at": now + ttl, "value": value}
+    data.update({key: {"expires_at": now + ttl, "value": value} for key, value in values.items()})
     try:
         _store(data)
     except OSError:
