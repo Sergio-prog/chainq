@@ -2,10 +2,21 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.23.0
+
+### Features
+- bulk multi-wallet portfolio with table views, clipboard input, and scan cache
+
+### Documentation
+- add install instructions to agent skill
+
 ## v0.22.1
 
 ### Fixes
 - return every ERC-20 transfer in tx --json output
+
+### Documentation
+- regenerate release references for v0.22.1
 
 ## v0.22.0
 
