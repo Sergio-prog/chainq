@@ -7,6 +7,17 @@ description: Query live crypto and onchain data via the chainq CLI - prices (spo
 
 Agent-friendly CLI for onchain and crypto market data. No API keys or setup needed for any command below; public RPC endpoints with automatic fallback are built in.
 
+## Install
+
+Check with `chainq --version`. If it is missing, install it (Python 3.12+):
+
+```bash
+uv tool install chainq                  # or: pipx install chainq, brew install sergio-prog/tap/chainq
+curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh   # bootstraps uv if needed
+```
+
+Full install options and docs for agents: https://chainq.serhiifotex.dev/llms.txt
+
 ## Output rules
 
 - Default output is one human-readable line per result — safe to show the user as-is. ANSI colors appear only in interactive terminals; your piped/captured output is always plain text (`--no-color` and `NO_COLOR` also force it off).
@@ -88,6 +99,10 @@ chainq portfolio vitalik.eth                                  # sweep ALL networ
 chainq portfolio 0x... -n ethereum -n base --min-usd 10       # restrict networks, raise the dust floor (default $1)
 chainq portfolio 0x... --all                                  # also show unpriced tokens and dust (hidden by default)
 chainq portfolio 0x... --defi                                 # fold in Hyperliquid + Lighter perp equity and spot balances
+chainq portfolio 0xA.. 0xB.. 0xC..                            # bulk: wallet × network USD matrix with row/column totals
+chainq portfolio -F wallets.txt --by total                    # bulk from file (one per line, commas ok; - = stdin): USD per wallet
+chainq portfolio -F wallets.txt --by token --json             # bulk token rows: address, network, symbol, amount, value_usd
+chainq portfolio --paste --by total                           # bulk from the user's clipboard (-p)
 chainq balance 0x... --coin usdt --network arbitrum           # ERC-20 by symbol (curated, then the catalog)
 chainq balance 0x... --coin basecat -n base                   # any catalog symbol works; ambiguous symbols error with candidates
 chainq balance 0x... --coin 0xTokenAddress -n base            # ERC-20 by contract address
@@ -263,7 +278,7 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 
 ## Recipes
 
-- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + every catalog token, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Use `balance` for a single token/network.
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + every catalog token, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Pass several addresses (or `-F file`) to scan many wallets in parallel; `--by network|total|token` picks the view; `--sort balance|input|address` orders wallets (default balance, largest first) and `--short` abbreviates addresses. Scan results are cached 5 min per wallet+network (`--no-cache` rescans); a progress spinner goes to stderr only on a TTY. Use `balance` for a single token/network.
 - "Unknown token 'X'" / "which address is X?" — `tokens search X -n <network>`; if several tokens share the symbol, pick the address and pass it to `balance --coin`.
 - "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.

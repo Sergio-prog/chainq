@@ -55,3 +55,11 @@ def test_blob_corrupt_file(tmp_path, monkeypatch):
     (tmp_path / "blobs" / "list.json").write_text("{not json")
     assert cache.get_blob("list") is None
     assert cache.blob_age("list") is None
+
+
+def test_put_many_get_many(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cache, "CACHE_FILE", tmp_path / "cache.json")
+    cache.put_many({"a": [1], "b": []}, ttl=60)
+    cache.put("stale", "old", ttl=-1)
+    assert cache.get_many(["a", "b", "stale", "missing"]) == {"a": [1], "b": []}

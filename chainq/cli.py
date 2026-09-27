@@ -1,4 +1,6 @@
 import json
+import os
+import signal
 import sys
 from typing import Annotated
 
@@ -6,7 +8,7 @@ import httpx
 import typer
 from web3.exceptions import Web3Exception
 
-from chainq import __version__, fmt, update
+from chainq import __version__, fmt, progress, update
 from chainq.commands import (
     address,
     buybacks,
@@ -107,7 +109,14 @@ def _fail(message: str) -> None:
     sys.exit(1)
 
 
+def _abort(*_: object) -> None:
+    progress.clear_line()
+    print("interrupted", file=sys.stderr, flush=True)
+    os._exit(130)
+
+
 def run():
+    signal.signal(signal.SIGINT, _abort)
     try:
         update.maybe_remind()
         app()

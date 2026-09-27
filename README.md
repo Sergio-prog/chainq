@@ -125,6 +125,12 @@ chainq balance 9WzDX... -n solana --coin usdc         # SOL and SPL token balanc
 chainq portfolio vitalik.eth                          # all networks: native + every catalog token, USD total, spam hidden
 chainq portfolio 9WzDX...                             # Solana wallets: SOL + every priced catalog mint
 chainq portfolio 0x... --defi --all                   # fold in Hyperliquid + Lighter perp+spot; show dust and unpriced too
+chainq portfolio 0xA.. 0xB.. 0xC..                    # many wallets: wallet × network USD table, labels link to DeBank
+chainq portfolio -F wallets.txt --sort input --short  # keep list order (default: by balance), abbreviate addresses
+chainq portfolio -F wallets.txt --by total            # one USD total per wallet (file: one address per line; - reads stdin)
+chainq portfolio -F wallets.txt --by token            # per-wallet token breakdown across networks
+chainq portfolio --paste                              # addresses straight from the clipboard (pbpaste/wl-paste/xclip/xsel)
+chainq portfolio --paste --no-cache                   # scans are cached 5 min per wallet+network; force a rescan
 chainq tokens search cat -n base                      # find tokens by symbol/name; status/refresh manage the daily cache
 chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
 chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
