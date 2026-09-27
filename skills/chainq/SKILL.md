@@ -7,6 +7,17 @@ description: Query live crypto and onchain data via the chainq CLI - prices (spo
 
 Agent-friendly CLI for onchain and crypto market data. No API keys or setup needed for any command below; public RPC endpoints with automatic fallback are built in.
 
+## Install
+
+Check with `chainq --version`. If it is missing, install it (Python 3.12+):
+
+```bash
+uv tool install chainq                  # or: pipx install chainq, brew install sergio-prog/tap/chainq
+curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh   # bootstraps uv if needed
+```
+
+Full install options and docs for agents: https://chainq.serhiifotex.dev/llms.txt
+
 ## Output rules
 
 - Default output is one human-readable line per result — safe to show the user as-is. ANSI colors appear only in interactive terminals; your piped/captured output is always plain text (`--no-color` and `NO_COLOR` also force it off).
