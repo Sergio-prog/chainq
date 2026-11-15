@@ -15,12 +15,13 @@ from rich.text import Text
 
 from chainq import cache, catalog, pricing, solana
 from chainq.errors import ChainqError
+from chainq.evm_address import resolve_address
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt, render_rich
 from chainq.progress import Progress
 from chainq.providers import coingecko, hyperliquid, lighter
-from chainq.rpc import connect, erc20, resolve_address, sweep_catalog
+from chainq.rpc import connect, erc20, sweep_catalog
 from chainq.tokens import TOKENS
 
 

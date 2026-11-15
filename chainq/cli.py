@@ -4,29 +4,39 @@ import signal
 import sys
 from typing import Annotated
 
-import httpx
 import typer
-from web3.exceptions import Web3Exception
 
-from chainq import __version__, fmt, progress, update
-from chainq.commands import (
-    address,
-    buybacks,
-    chain,
-    config,
-    etf,
-    evm,
-    market,
-    nft,
-    portfolio,
-    protocols,
-    stables,
-    tokens,
-    yields,
-)
+from chainq import __version__, fmt, progress
 from chainq.errors import ChainqError
+from chainq.lazy import lazy_group
+
+COMMANDS = {
+    "networks": "chainq.commands.chain:networks",
+    "balance": "chainq.commands.chain:balance",
+    "gas": "chainq.commands.chain:gas",
+    "tx": "chainq.commands.chain:tx",
+    "rpc": "chainq.commands.chain:rpc",
+    "evm": "chainq.commands.evm:app",
+    "address": "chainq.commands.address:address",
+    "portfolio": "chainq.commands.portfolio:portfolio",
+    "price": "chainq.commands.market:price",
+    "asset": "chainq.commands.market:asset",
+    "search": "chainq.commands.market:search",
+    "trending": "chainq.commands.market:trending",
+    "candles": "chainq.commands.market:candles",
+    "stables": "chainq.commands.stables:stables",
+    "yields": "chainq.commands.yields:yields",
+    "buybacks": "chainq.commands.buybacks:buybacks",
+    "etf": "chainq.commands.etf:etf",
+    "update": "chainq.update:update",
+    "protocols": "chainq.commands.protocols:app",
+    "nft": "chainq.commands.nft:app",
+    "tokens": "chainq.commands.tokens:app",
+    "config": "chainq.commands.config:app",
+}
 
 app = typer.Typer(
+    cls=lazy_group(COMMANDS),
     add_completion=True,
     no_args_is_help=True,
     pretty_exceptions_enable=False,
@@ -52,29 +62,6 @@ def main(
 ):
     if no_color:
         fmt.disable_colors()
-
-app.command()(chain.networks)
-app.command()(chain.balance)
-app.command()(chain.gas)
-app.command()(chain.tx)
-app.command()(chain.rpc)
-app.add_typer(evm.app, name="evm")
-app.command()(address.address)
-app.command()(portfolio.portfolio)
-app.command()(market.price)
-app.command()(market.asset)
-app.command()(market.search)
-app.command()(market.trending)
-app.command()(market.candles)
-app.command()(stables.stables)
-app.command()(yields.yields)
-app.command()(buybacks.buybacks)
-app.command()(etf.etf)
-app.command()(update.update)
-app.add_typer(protocols.app, name="protocols")
-app.add_typer(nft.app, name="nft")
-app.add_typer(tokens.app, name="tokens")
-app.add_typer(config.app, name="config")
 
 
 @app.command()
@@ -115,14 +102,29 @@ def _abort(*_: object) -> None:
     os._exit(130)
 
 
+def _is_web3_error(exc: Exception) -> bool:
+    web3_exceptions = sys.modules.get("web3.exceptions")
+    return web3_exceptions is not None and isinstance(exc, web3_exceptions.Web3Exception)
+
+
+def _is_http_error(exc: Exception) -> bool:
+    httpx = sys.modules.get("httpx")
+    return httpx is not None and isinstance(exc, httpx.HTTPError)
+
+
 def run():
     signal.signal(signal.SIGINT, _abort)
     try:
+        from chainq import update
+
+
         update.maybe_remind()
         app()
     except ChainqError as exc:
         _fail(str(exc))
-    except httpx.HTTPError as exc:
-        _fail(f"http request failed: {exc}")
-    except Web3Exception as exc:
-        _fail(f"rpc request failed: {exc}")
+    except Exception as exc:
+        if _is_http_error(exc):
+            _fail(f"http request failed: {exc}")
+        if _is_web3_error(exc):
+            _fail(f"rpc request failed: {exc}")
+        raise

@@ -3,10 +3,10 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
+from chainq.evm_address import resolve_address
 from chainq.fmt import dim, fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import lighter
-from chainq.rpc import resolve_address
 
 app = typer.Typer(no_args_is_help=True, help="Lighter public market data (perps, spot).")
 spot_app = typer.Typer(no_args_is_help=True, help="Lighter spot markets and balances.")

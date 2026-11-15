@@ -54,7 +54,7 @@ COINGECKO_SOLANA = {"tokens": [{"address": NEW_MINT, "name": "Bonk", "symbol": "
 @pytest.fixture
 def stubbed_sources(monkeypatch, tmp_path):
     monkeypatch.setattr(cache, "BLOB_DIR", tmp_path / "blobs")
-    catalog.tokens_for.cache_clear()
+    catalog.clear_memory_cache()
     catalog.PENDLE_PRICES.clear()
     payloads = {
         catalog.COINGECKO_LIST_URL.format(platform="base"): COINGECKO_BASE,
@@ -71,7 +71,7 @@ def stubbed_sources(monkeypatch, tmp_path):
 
     monkeypatch.setattr(catalog, "_fetch_json", fake_fetch)
     yield calls
-    catalog.tokens_for.cache_clear()
+    catalog.clear_memory_cache()
     catalog.PENDLE_PRICES.clear()
 
 
@@ -133,7 +133,7 @@ def test_search_orders_exact_then_registry_then_rest(stubbed_sources):
 
 def test_stale_blob_used_when_fetch_fails(stubbed_sources, monkeypatch):
     catalog.tokens_for("base")
-    catalog.tokens_for.cache_clear()
+    catalog.clear_memory_cache()
     monkeypatch.setattr(catalog, "_fetch_json", lambda url: None)
     monkeypatch.setattr(catalog, "CATALOG_TTL", -1)
     assert _by_address("base", BASECAT) is not None
@@ -142,13 +142,13 @@ def test_stale_blob_used_when_fetch_fails(stubbed_sources, monkeypatch):
 def test_no_cache_and_fetch_failure_degrades_to_registry(monkeypatch, tmp_path):
     monkeypatch.setattr(cache, "BLOB_DIR", tmp_path / "blobs")
     monkeypatch.setattr(catalog, "_fetch_json", lambda url: None)
-    catalog.tokens_for.cache_clear()
+    catalog.clear_memory_cache()
     try:
         tokens = catalog.tokens_for("base")
         assert tokens and all(t.source == "registry" for t in tokens)
         assert all(t.decimals is None for t in tokens)
     finally:
-        catalog.tokens_for.cache_clear()
+        catalog.clear_memory_cache()
 
 
 def test_status_and_refresh(stubbed_sources):
