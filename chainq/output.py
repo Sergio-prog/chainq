@@ -2,14 +2,15 @@ import io
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.console import Console, RenderableType
-from rich.measure import Measurement
 
 from chainq.errors import ChainqError
 from chainq.fmt import color_enabled, dim, fmt_amount
+
+if TYPE_CHECKING:
+    from rich.console import RenderableType
 
 FORMATS = ("text", "json", "table", "toon")
 
@@ -28,7 +29,10 @@ def dim_label(line: str) -> str:
     return dim(line[: idx + 1]) + line[idx + 1 :]
 
 
-def render_rich(renderable: RenderableType) -> list[str]:
+def render_rich(renderable: "RenderableType") -> list[str]:
+    from rich.console import Console
+    from rich.measure import Measurement
+
     color = color_enabled()
     console = Console(file=io.StringIO(), width=10_000, force_terminal=color, no_color=not color, highlight=False)
     width = Measurement.get(console, console.options, renderable).maximum

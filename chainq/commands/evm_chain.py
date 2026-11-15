@@ -8,10 +8,11 @@ from web3.exceptions import Web3RPCError
 
 from chainq.errors import ChainqError
 from chainq.evm import calldata, decode_abi, json_value, parse_abi_types
+from chainq.evm_address import resolve_address
 from chainq.fmt import fmt_amount, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
-from chainq.rpc import connect, resolve_address
+from chainq.rpc import connect
 
 NetworkOpt = Annotated[str, typer.Option("--network", "-n", help="EVM network key, alias, or chain id")]
 

@@ -12,7 +12,7 @@ from web3.types import RPCEndpoint, RPCResponse
 from chainq.catalog import CatalogToken
 from chainq.config import settings
 from chainq.errors import ChainqError
-from chainq.networks import NETWORKS, Network
+from chainq.networks import Network
 
 ERC20_ABI = [
     {
@@ -273,20 +273,6 @@ def connect(network: Network) -> ChainClient:
     w3 = Web3(provider)
     w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
     return ChainClient(w3=w3, network=network, provider=provider)
-
-
-def resolve_address(value: str) -> str:
-    value = value.strip()
-    if value.lower().endswith(".eth"):
-        client = connect(NETWORKS["ethereum"])
-        resolved = client.w3.ens.address(value)
-        if resolved is None:
-            raise ChainqError(f"could not resolve ENS name '{value}'")
-        return resolved
-    try:
-        return Web3.to_checksum_address(value)
-    except Exception as exc:
-        raise ChainqError(f"invalid address '{value}'") from exc
 
 
 def erc20(client: ChainClient, address: str):

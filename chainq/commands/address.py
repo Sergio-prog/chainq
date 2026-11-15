@@ -5,6 +5,7 @@ import typer
 from web3 import Web3
 
 from chainq import catalog, pricing, solana
+from chainq.evm_address import resolve_address
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
@@ -15,7 +16,6 @@ from chainq.rpc import (
     decode_uint,
     encode_erc20,
     multicall,
-    resolve_address,
     sweep_catalog,
 )
 

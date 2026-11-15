@@ -1,11 +1,10 @@
 from dataclasses import dataclass, replace
 from functools import cache as memoize
 
-from web3 import Web3
-
 from chainq import __version__, cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
+from chainq.evm_address import checksum, is_hex_address
 from chainq.networks import NETWORKS
 from chainq.providers.coingecko_data import PLATFORM_IDS, SYMBOL_TO_ID
 from chainq.solana import is_solana_address
@@ -74,12 +73,7 @@ def _load_source(name: str, url: str) -> object | None:
 
 
 def _checksum(address: object) -> str | None:
-    if not isinstance(address, str) or not address.startswith("0x") or len(address) != 42:
-        return None
-    try:
-        return Web3.to_checksum_address(address)
-    except Exception:
-        return None
+    return checksum(address) if is_hex_address(address) else None
 
 
 def _decimals(value: object) -> int | None:
