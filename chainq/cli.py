@@ -33,6 +33,7 @@ COMMANDS = {
     "nft": "chainq.commands.nft:app",
     "tokens": "chainq.commands.tokens:app",
     "config": "chainq.commands.config:app",
+    "schema": "chainq.commands.schema:schema",
 }
 
 app = typer.Typer(
@@ -119,6 +120,8 @@ def run():
 
 
         update.maybe_remind()
+        if not fmt.color_enabled():
+            typer.core.HAS_RICH = False
         app()
     except ChainqError as exc:
         _fail(str(exc))

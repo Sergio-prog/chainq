@@ -277,7 +277,7 @@ chainq ships a [skill](skills/chainq/SKILL.md) that teaches agents when and how 
 npx skills add Sergio-prog/chainq
 ```
 
-No skill installed? Agents can self-discover everything via `chainq -h` and `chainq <command> -h`.
+No skill installed? `chainq schema` lists every command with its arguments and options as one line each (`--json` for the full structure, `chainq schema protocols hl` for a subtree). Help is plain text when piped.
 
 ## Roadmap
 
