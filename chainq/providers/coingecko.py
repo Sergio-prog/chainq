@@ -1,35 +1,31 @@
-import httpx
 
 from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
+from chainq.http import UpstreamError
 from chainq.providers.coingecko_data import CONTRACT_LOOKUP_ORDER, PLATFORM_IDS, SYMBOL_TO_ID
 from chainq.solana import looks_like_solana
 
 BASE_URL = "https://api.coingecko.com/api/v3"
 
 
-def _get(path: str, params: dict | None = None, ttl: float = 30, none_on_404: bool = False) -> dict | list | None:
-    key = cache.key_for("coingecko", path, params)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-    headers = {}
-    if settings.coingecko_api_key:
-        headers["x-cg-demo-api-key"] = settings.coingecko_api_key
+RATE_LIMIT_HINT = "CoinGecko rate limit hit; retry in ~1 minute or set COINGECKO_API_KEY"
+
+
+def _fetch(path: str, params: dict | None, missing_ok: bool) -> dict | list | None:
+    headers = {"x-cg-demo-api-key": settings.coingecko_api_key} if settings.coingecko_api_key else {}
     try:
-        resp = http.get(f"{BASE_URL}{path}", params=params or {}, headers=headers, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"CoinGecko request failed: {exc}") from exc
-    if resp.status_code == 429:
-        raise ChainqError("CoinGecko rate limit hit; retry in ~1 minute or set COINGECKO_API_KEY")
-    if resp.status_code == 404 and none_on_404:
-        return None
-    if resp.status_code >= 400:
-        raise ChainqError(f"CoinGecko returned HTTP {resp.status_code} for {path}")
-    result = resp.json()
-    cache.put(key, result, ttl)
-    return result
+        return http.fetch_json("CoinGecko", f"{BASE_URL}{path}", params=params or {}, headers=headers, missing_ok=missing_ok)
+    except UpstreamError as exc:
+        if exc.status == 429:
+            raise ChainqError(RATE_LIMIT_HINT) from exc
+        if exc.status:
+            raise ChainqError(f"{exc} for {path}") from exc
+        raise
+
+
+def _get(path: str, params: dict | None = None, ttl: float = 30, none_on_404: bool = False) -> dict | list | None:
+    return cache.remember(("coingecko", path, params), ttl, lambda: _fetch(path, params, none_on_404))
 
 
 def is_address(query: str) -> bool:

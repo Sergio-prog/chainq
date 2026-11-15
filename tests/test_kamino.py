@@ -1,6 +1,7 @@
 import pytest
 
-from chainq.commands.kamino import _collect_rows, _filter_rows, _reserve_row, _selected_markets, _sort_rows
+from chainq.commands.kamino import _collect_rows, _filter_rows, _selected_markets, _sort_rows
+from chainq.providers.kamino import reserve_row
 
 MARKET = {
     "name": "Primary market on mainnet",
@@ -20,7 +21,7 @@ RESERVE = {
 
 
 def test_reserve_row_normalizes_string_values():
-    row = _reserve_row(MARKET, RESERVE)
+    row = reserve_row(MARKET, RESERVE)
 
     assert row is not None
     assert row["supply_apy_pct"] == pytest.approx(4.21)
@@ -32,7 +33,7 @@ def test_reserve_row_normalizes_string_values():
 
 
 def test_zero_supply_has_no_utilization():
-    row = _reserve_row(MARKET, {**RESERVE, "totalSupplyUsd": "0"})
+    row = reserve_row(MARKET, {**RESERVE, "totalSupplyUsd": "0"})
 
     assert row is not None
     assert row["utilization_pct"] is None
@@ -40,8 +41,8 @@ def test_zero_supply_has_no_utilization():
 
 @pytest.mark.parametrize("sort", ["supplied", "supply-apy", "borrow-apy", "utilization"])
 def test_sort_rows(sort):
-    low = _reserve_row(MARKET, RESERVE)
-    high = _reserve_row(
+    low = reserve_row(MARKET, RESERVE)
+    high = reserve_row(
         MARKET,
         {
             **RESERVE,
@@ -58,7 +59,7 @@ def test_sort_rows(sort):
 
 
 def test_filter_rows_matches_symbol_and_mint_exactly_case_insensitive():
-    row = _reserve_row(MARKET, RESERVE)
+    row = reserve_row(MARKET, RESERVE)
 
     assert row is not None
     assert _filter_rows([row], "usdc") == [row]

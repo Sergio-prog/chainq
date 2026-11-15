@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 CACHE_DIR = Path.home() / ".cache" / "chainq"
@@ -54,6 +55,17 @@ def get_many(keys: list[str]) -> dict[str, object]:
     now = time.time()
     data = _load()
     return {k: data[k]["value"] for k in keys if k in data and data[k].get("expires_at", 0) > now}
+
+
+def remember[T](parts: tuple, ttl: float, compute: Callable[[], T]) -> T:
+    key = key_for(*parts)
+    cached = get(key)
+    if cached is not None:
+        return cached
+    value = compute()
+    if value is not None:
+        put(key, value, ttl)
+    return value
 
 
 def put(key: str, value: object, ttl: float) -> None:

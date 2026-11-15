@@ -1,5 +1,4 @@
 import json
-from decimal import Decimal
 
 from eth_abi import decode, encode
 from eth_account.messages import encode_defunct
@@ -89,17 +88,6 @@ def json_value(value):
     if isinstance(value, tuple):
         return [json_value(item) for item in value]
     return value
-
-
-def scale_to_base(value: str, decimals: int) -> int:
-    scaled = Decimal(value) * Decimal(10**decimals)
-    if scaled != scaled.to_integral_value():
-        raise ChainqError(f"{value} has more than {decimals} decimal places")
-    return int(scaled)
-
-
-def scale_from_base(value: str, decimals: int) -> Decimal:
-    return Decimal(value) / Decimal(10**decimals)
 
 
 def hash_message(value: str) -> str:

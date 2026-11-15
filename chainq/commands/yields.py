@@ -5,11 +5,6 @@ from typing import Annotated
 
 import typer
 
-from chainq.commands.aave import _reserve_row as aave_reserve_row
-from chainq.commands.kamino import _reserve_row as kamino_reserve_row
-from chainq.commands.morpho import _market_row as morpho_market_row
-from chainq.commands.morpho import _vault_row as morpho_vault_row
-from chainq.commands.pendle import _market_row as pendle_market_row
 from chainq.errors import ChainqError
 from chainq.fmt import dim, green, humanize_num, humanize_usd
 from chainq.networks import NETWORKS, resolve_network
@@ -54,7 +49,7 @@ def _aave_rows(network: str) -> list[dict]:
         for reserve in market.get("reserves") or []:
             if reserve.get("isPaused"):
                 continue
-            mapped = aave_reserve_row(market, reserve)
+            mapped = aave.reserve_row(market, reserve)
             rows.append(
                 _row(
                     "aave",
@@ -74,7 +69,7 @@ def _kamino_rows() -> list[dict]:
     rows = []
     for market in kamino.market_configs():
         for reserve in kamino.reserve_metrics(market["lendingMarket"]):
-            mapped = kamino_reserve_row(market, reserve)
+            mapped = kamino.reserve_row(market, reserve)
             if mapped is None:
                 continue
             rows.append(
@@ -95,7 +90,7 @@ def _kamino_rows() -> list[dict]:
 def _morpho_market_rows(network: str) -> list[dict]:
     rows = []
     for market in morpho.markets(NETWORKS[network].chain_id):
-        mapped = morpho_market_row(market)
+        mapped = morpho.market_row(market)
         rows.append(
             _row(
                 "morpho",
@@ -114,7 +109,7 @@ def _morpho_market_rows(network: str) -> list[dict]:
 def _morpho_vault_rows(network: str) -> list[dict]:
     rows = []
     for vault in morpho.vaults(NETWORKS[network].chain_id):
-        mapped = morpho_vault_row(vault)
+        mapped = morpho.vault_row(vault)
         rows.append(
             _row(
                 "morpho",
@@ -133,7 +128,7 @@ def _morpho_vault_rows(network: str) -> list[dict]:
 def _pendle_rows(network: str) -> list[dict]:
     rows = []
     for market in pendle.active_markets(NETWORKS[network].chain_id):
-        mapped = pendle_market_row(market)
+        mapped = pendle.market_row(market)
         rows.append(
             _row(
                 "pendle",

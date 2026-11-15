@@ -1,4 +1,3 @@
-import httpx
 
 from chainq import cache, http
 from chainq.errors import ChainqError
@@ -24,22 +23,13 @@ CHAIN_IDS = {
 
 
 def _fetch(path: str) -> dict:
-    key = cache.key_for("curve", path)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-    try:
-        resp = http.get(f"{BASE_URL}{path}")
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"Curve API request failed: {exc}") from exc
-    if resp.status_code >= 400:
-        raise ChainqError(f"Curve API returned HTTP {resp.status_code} for {path}")
-    payload = resp.json()
-    if not payload.get("success"):
-        raise ChainqError(f"Curve API returned an unsuccessful response for {path}")
-    data = payload.get("data") or {}
-    cache.put(key, data, ttl=120)
-    return data
+    def fetch() -> dict:
+        payload = http.fetch_json("Curve API", f"{BASE_URL}{path}")
+        if not payload.get("success"):
+            raise ChainqError(f"Curve API returned an unsuccessful response for {path}")
+        return payload.get("data") or {}
+
+    return cache.remember(("curve", path), 120, fetch)
 
 
 def chain_id(network_key: str) -> str:

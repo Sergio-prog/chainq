@@ -49,7 +49,7 @@ def test_invalid_asset_rejected():
 def test_theblock_parses_series_into_daily_totals(monkeypatch):
     monkeypatch.setattr(theblock.cache, "get", lambda key: None)
     monkeypatch.setattr(theblock.cache, "put", lambda *a, **k: None)
-    monkeypatch.setattr(theblock.http, "get", lambda url, **kwargs: _Resp())
+    monkeypatch.setattr(theblock.http, "request", lambda method, url, **kwargs: _Resp())
     rows = theblock.flow_history("BTC")
     assert rows[0]["date"] == "2026-07-17"
     assert rows[0]["net_flow_usd"] == 132_300_000.0

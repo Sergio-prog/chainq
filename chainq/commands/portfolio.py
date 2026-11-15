@@ -2,9 +2,7 @@ import re
 import shutil
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
-from decimal import Decimal
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
@@ -14,228 +12,12 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
-from chainq import cache, catalog, pricing, solana
+from chainq import catalog
 from chainq.errors import ChainqError
-from chainq.evm_address import resolve_address
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
-from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt, render_rich
-from chainq.progress import Progress
-from chainq.providers import coingecko, hyperliquid, lighter
-from chainq.rpc import connect, erc20, sweep_catalog
-from chainq.tokens import TOKENS
+from chainq.wallets import SCAN_TTL, ScanResult, Target, resolve_targets, scan_wallets
 
-
-def _scan_evm_legacy(client, net, address: str) -> list[dict]:
-    assets = []
-    wei = client.w3.eth.get_balance(address)
-    if wei:
-        assets.append(
-            {
-                "network": net.key,
-                "symbol": net.native_symbol,
-                "token_address": None,
-                "amount": str(Decimal(wei) / Decimal(10**18)),
-                "coingecko_id": net.native_coingecko_id,
-            }
-        )
-    for symbol, token_address in TOKENS.get(net.key, {}).items():
-        if token_address == net.native_erc20:
-            continue
-        contract = erc20(client, token_address)
-        raw = contract.functions.balanceOf(address).call()
-        if not raw:
-            continue
-        decimals = contract.functions.decimals().call()
-        assets.append(
-            {
-                "network": net.key,
-                "symbol": contract.functions.symbol().call(),
-                "token_address": token_address,
-                "amount": str(Decimal(raw) / Decimal(10**decimals)),
-                "kind": "token",
-                "source": "registry",
-                "coingecko_id": coingecko.SYMBOL_TO_ID.get(symbol),
-            }
-        )
-    return assets
-
-
-def _scan_evm(net_key: str, address: str) -> list[dict]:
-    net = NETWORKS[net_key]
-    client = connect(net)
-    try:
-        wei, rows = sweep_catalog(client, address, list(catalog.tokens_for(net.key)))
-    except Exception:
-        return _scan_evm_legacy(client, net, address)
-    assets = []
-    if wei:
-        assets.append(
-            {
-                "network": net.key,
-                "symbol": net.native_symbol,
-                "token_address": None,
-                "amount": str(Decimal(wei) / Decimal(10**18)),
-                "coingecko_id": net.native_coingecko_id,
-            }
-        )
-    for row in rows:
-        if row["token_address"] == net.native_erc20:
-            continue
-        token = row["catalog"]
-        assets.append(
-            {
-                "network": net.key,
-                "symbol": row["symbol"],
-                "token_address": row["token_address"],
-                "amount": str(Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"])),
-                "kind": token.kind,
-                "source": token.source,
-                "coingecko_id": token.coingecko_id,
-            }
-        )
-    return assets
-
-
-def _scan_solana(address: str) -> list[dict]:
-    assets = []
-    lamports = solana.get_balance(address)
-    if lamports:
-        assets.append(
-            {
-                "network": "solana",
-                "symbol": "SOL",
-                "token_address": None,
-                "amount": str(solana.lamports_to_sol(lamports)),
-                "coingecko_id": "solana",
-            }
-        )
-    for account in solana.token_accounts(address):
-        if not account["raw_amount"]:
-            continue
-        token = catalog.lookup("solana", account["mint"])
-        assets.append(
-            {
-                "network": "solana",
-                "symbol": token.symbol if token else short_addr(account["mint"]),
-                "token_address": account["mint"],
-                "amount": account["amount"],
-                "kind": token.kind if token else "unknown",
-                "source": token.source if token else None,
-                "coingecko_id": token.coingecko_id if token else None,
-            }
-        )
-    return assets
-
-
-def _scan_network(net_key: str, address: str) -> list[dict]:
-    if NETWORKS[net_key].kind == "solana":
-        return _scan_solana(address)
-    return _scan_evm(net_key, address)
-
-
-def _scan_hyperliquid(address: str) -> list[dict]:
-    assets: list[dict] = []
-    state = hyperliquid.clearinghouse_state(address)
-    equity = float((state.get("marginSummary") or {}).get("accountValue") or 0)
-    if equity:
-        assets.append(
-            {
-                "network": "hyperliquid",
-                "symbol": "perp equity (USDC)",
-                "token_address": None,
-                "amount": str(equity),
-                "price_usd": 1.0,
-                "price_source": "hyperliquid",
-                "value_usd": equity,
-            }
-        )
-    balances = hyperliquid.spot_balances(address)
-    if not balances:
-        return assets
-    prices = {"USDC": 1.0}
-    for m in hyperliquid.spot_markets():
-        price = m["mid_price"] or m["mark_price"]
-        if m["base"] and price:
-            prices[m["base"]] = price
-    for b in balances:
-        total = float(b.get("total") or 0)
-        if not total:
-            continue
-        price = prices.get(b.get("coin"))
-        assets.append(
-            {
-                "network": "hyperliquid",
-                "symbol": b.get("coin"),
-                "token_address": None,
-                "amount": str(total),
-                "price_usd": price,
-                "price_source": "hyperliquid" if price is not None else None,
-                "value_usd": total * price if price is not None else None,
-            }
-        )
-    return assets
-
-
-def _scan_lighter(address: str) -> list[dict]:
-    acc = lighter.find_account(address)
-    if acc is None:
-        return []
-    balances = lighter.asset_balances(acc)
-    assets: list[dict] = []
-    equity = float(acc.get("total_asset_value") or 0)
-    if equity:
-        assets.append(
-            {
-                "network": "lighter",
-                "symbol": "perp equity (USDC)",
-                "token_address": None,
-                "amount": str(equity),
-                "price_usd": 1.0,
-                "price_source": "lighter",
-                "value_usd": equity,
-            }
-        )
-    for b in balances:
-        amount = b["total"] - (b["margin"] if b["coin"] == "USDC" else 0)
-        if not amount:
-            continue
-        price = b["price_usd"]
-        assets.append(
-            {
-                "network": "lighter",
-                "symbol": b["coin"],
-                "token_address": None,
-                "amount": str(amount),
-                "price_usd": price,
-                "price_source": "lighter" if price is not None else None,
-                "value_usd": amount * price if price is not None else None,
-            }
-        )
-    return assets
-
-
-def _resolve_scan_target(address: str, networks: list[str] | None) -> tuple[str, list[str]]:
-    value = address.strip()
-    if solana.looks_like_solana(value):
-        kind, addr = "solana", solana.resolve_solana_address(value)
-    else:
-        kind, addr = "evm", resolve_address(value)
-    if networks:
-        requested = [resolve_network(n) for n in networks]
-        mismatched = [n.key for n in requested if n.kind != kind]
-        if mismatched:
-            raise ChainqError(
-                f"{', '.join(mismatched)} cannot hold this address "
-                f"({'base58 Solana pubkey' if kind == 'solana' else '0x EVM address'})"
-            )
-        return addr, [n.key for n in requested]
-    return addr, [key for key, net in NETWORKS.items() if net.kind == kind]
-
-
-MAX_SCAN_WORKERS = 16
-SCAN_TTL = 300
-DEFI_SCANNERS = {"hyperliquid": _scan_hyperliquid, "lighter": _scan_lighter}
 VIEWS = ("network", "total", "token")
 
 
@@ -284,78 +66,6 @@ def _gather_inputs(addresses: list[str] | None, file: str | None, paste: bool = 
     return list(dict.fromkeys(values))
 
 
-def _resolve_targets(inputs: list[str], networks: list[str] | None) -> list[tuple[str, str, list[str]]]:
-    targets: dict[str, tuple[str, str, list[str]]] = {}
-    invalid: list[str] = []
-    for value in inputs:
-        try:
-            addr, keys = _resolve_scan_target(value, networks)
-        except ChainqError as exc:
-            if len(inputs) == 1:
-                raise
-            invalid.append(f"{value} ({exc})")
-            continue
-        targets.setdefault(addr, (value, addr, keys))
-    if invalid:
-        raise ChainqError("cannot scan: " + "; ".join(invalid))
-    return list(targets.values())
-
-
-def _scan_job(addr: str, source: str) -> list[dict]:
-    if source in DEFI_SCANNERS:
-        return DEFI_SCANNERS[source](addr)
-    return _scan_network(source, addr)
-
-
-@dataclass
-class ScanResult:
-    assets: dict[str, list[dict]]
-    unreachable: dict[str, list[str]]
-    cache_hits: int
-    price_failures: list[str]
-
-
-def _scan_wallets(targets: list[tuple[str, str, list[str]]], defi: bool, use_cache: bool) -> ScanResult:
-    jobs = [(addr, key) for _, addr, keys in targets for key in keys]
-    if defi:
-        jobs += [(addr, source) for _, addr, _ in targets if addr.startswith("0x") for source in DEFI_SCANNERS]
-    keys = {job: cache.key_for("portfolio", *job) for job in jobs}
-    cached = cache.get_many(list(keys.values())) if use_cache else {}
-    assets: dict[str, list[dict]] = {addr: [] for _, addr, _ in targets}
-    unreachable: dict[str, list[str]] = {addr: [] for _, addr, _ in targets}
-    for (addr, _), key in keys.items():
-        assets[addr].extend(cached.get(key, []))
-    pending = [job for job in jobs if keys[job] not in cached]
-    scanned: dict[tuple[str, str], list[dict]] = {}
-    price_failures: list[str] = []
-    if pending:
-        wallets = len({addr for addr, _ in pending})
-        with Progress(f"scanning {wallets} wallet(s)", len(pending)) as progress:
-            with ThreadPoolExecutor(max_workers=min(MAX_SCAN_WORKERS, len(pending))) as pool:
-                futures = {pool.submit(_scan_job, *job): job for job in pending}
-                for future in as_completed(futures):
-                    job = futures[future]
-                    progress.advance()
-                    try:
-                        scanned[job] = future.result()
-                    except Exception:
-                        unreachable[job[0]].append(job[1])
-            progress.stage("pricing assets")
-            price_failures = pricing.price_assets(
-                [a for (_, source), found in scanned.items() if source not in DEFI_SCANNERS for a in found]
-            )
-        if not price_failures:
-            cache.put_many({keys[job]: found for job, found in scanned.items()}, SCAN_TTL)
-        for (addr, _), found in scanned.items():
-            assets[addr].extend(found)
-    return ScanResult(
-        assets=assets,
-        unreachable={addr: sorted(keys) for addr, keys in unreachable.items()},
-        cache_hits=len(jobs) - len(pending),
-        price_failures=price_failures,
-    )
-
-
 def _filter_assets(assets: list[dict], min_usd: float, show_all: bool, hide_unpriced: bool) -> tuple[list[dict], int]:
     kept = []
     for a in assets:
@@ -370,13 +80,29 @@ def _filter_assets(assets: list[dict], min_usd: float, show_all: bool, hide_unpr
     return kept, len(assets) - len(kept)
 
 
+def _wallet_report(target: Target, scan: ScanResult, min_usd: float, show_all: bool, hide_unpriced: bool) -> dict:
+    assets, hidden = _filter_assets(scan.assets[target.address], min_usd, show_all, hide_unpriced)
+    by_network: dict[str, float] = {}
+    for asset in assets:
+        by_network[asset["network"]] = by_network.get(asset["network"], 0) + (asset["value_usd"] or 0)
+    return {
+        "input": target.input,
+        "address": target.address,
+        "assets": assets,
+        "hidden": hidden,
+        "unreachable": scan.unreachable[target.address],
+        "networks": {network: usd for network, usd in by_network.items() if usd},
+        "total_usd": sum(by_network.values()),
+    }
+
+
 def _hidden_note(hidden: int, show_all: bool, min_usd: float) -> str:
     reason = "unpriced" if show_all else f"below {fmt_usd(min_usd)} or unpriced; --all shows them"
     return f"  ({hidden} asset(s) hidden: {reason})"
 
 
 def _single_report(
-    out: Out, wallet: dict, keys: list[str], defi: bool, show_all: bool, min_usd: float, scan: ScanResult
+    out: Out, wallet: dict, keys: tuple[str, ...], defi: bool, show_all: bool, min_usd: float, scan: ScanResult
 ) -> None:
     address, addr, assets = wallet["input"], wallet["address"], wallet["assets"]
     unreachable, hidden, total = wallet["unreachable"], wallet["hidden"], wallet["total_usd"]
@@ -569,40 +295,21 @@ def portfolio(
         raise ChainqError(f"unknown view '{by}' (use: {' | '.join(VIEWS)})")
     if sort not in SORTS:
         raise ChainqError(f"unknown sort '{sort}' (use: {' | '.join(SORTS)})")
-    targets = _resolve_targets(_gather_inputs(addresses, file, paste), networks)
-    scan = _scan_wallets(targets, defi, not no_cache)
-    wallets = []
-    for value, addr, _ in targets:
-        assets, hidden = _filter_assets(scan.assets[addr], min_usd, show_all, hide_unpriced)
-        by_network: dict[str, float] = {}
-        for a in assets:
-            by_network[a["network"]] = by_network.get(a["network"], 0) + (a["value_usd"] or 0)
-        wallets.append(
-            {
-                "input": value,
-                "address": addr,
-                "assets": assets,
-                "hidden": hidden,
-                "unreachable": scan.unreachable[addr],
-                "networks": {n: usd for n, usd in by_network.items() if usd},
-                "total_usd": sum(by_network.values()),
-            }
-        )
-    if len(wallets) == 1 and by is None:
-        _single_report(out, wallets[0], targets[0][2], defi, show_all, min_usd, scan)
+    targets = resolve_targets(_gather_inputs(addresses, file, paste), networks)
+    scan = scan_wallets(targets, defi, not no_cache)
+    reports = [_wallet_report(target, scan, min_usd, show_all, hide_unpriced) for target in targets]
+    if len(reports) == 1 and by is None:
+        _single_report(out, reports[0], targets[0].networks, defi, show_all, min_usd, scan)
         return
-    if all(not w["assets"] and w["unreachable"] for w in wallets):
+    if all(not w["assets"] and w["unreachable"] for w in reports):
         raise ChainqError("no assets found; every scanned network was unreachable")
     view = {"network": _network_view, "total": _total_view, "token": _token_view}[by or "network"]
-    data, table = view(_sort_wallets(wallets, sort), short)
+    data, table = view(_sort_wallets(reports, sort), short)
     lines = render_rich(table)
-    hidden = sum(w["hidden"] for w in wallets)
-    failed: dict[str, int] = {}
-    for w in wallets:
-        for key in w["unreachable"]:
-            failed[key] = failed.get(key, 0) + 1
+    hidden = sum(w["hidden"] for w in reports)
+    failed = dict(Counter(key for w in reports for key in w["unreachable"]))
     data = {
-        "wallets_scanned": len(wallets),
+        "wallets_scanned": len(reports),
         "hidden_assets": hidden,
         "unreachable": failed,
         "price_failures": scan.price_failures,
@@ -614,13 +321,13 @@ def portfolio(
         lines.append("(unreachable: " + ", ".join(f"{k} for {n} wallet(s)" for k, n in sorted(failed.items())) + ")")
     if scan.price_failures:
         lines.append(_price_failure_note(scan.price_failures))
-    keys = sorted({k for _, _, ks in targets for k in ks})
+    keys = sorted({key for target in targets for key in target.networks})
     out.emit(
         data,
         lines,
         quiet_value=data["total_usd"],
         verbose_lines=[
-            f"scanned {len(wallets)} wallet(s) × {len(keys)} network(s)" + (" + Hyperliquid + Lighter" if defi else ""),
+            f"scanned {len(reports)} wallet(s) × {len(keys)} network(s)" + (" + Hyperliquid + Lighter" if defi else ""),
             _cache_note(scan.cache_hits),
             "links: wallet labels open DeBank in terminals with OSC 8 hyperlink support",
         ],
