@@ -36,6 +36,12 @@ SMOKE = {
     "curve-pools": ["protocols", "curve", "pools", "-l", "3"],
     "solana-gas": ["gas", "-n", "solana"],
     "solana-balance": ["balance", "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "-n", "solana"],
+    "solana-address-program": ["address", "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"],
+    "tron-gas": ["gas", "-n", "tron"],
+    "tron-balance": ["balance", "TJCo98saj6WND61g1uuKwJ9GMWMT9WkJFo", "-c", "usdt"],
+    "tron-address": ["address", "TFFAMQLZybALaLb4uxHA9RBE7pxhUAjF3U"],
+    "tron-tx-gasfree": ["tx", "b2bd6e6316c0f24ecea43d4269ae1e4372928a3ca5d2d9f2d85cb72c828060c8"],
+    "tron-portfolio": ["portfolio", "TJCo98saj6WND61g1uuKwJ9GMWMT9WkJFo"],
     "address-eoa": ["address", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"],
     "catalog-portfolio-base": ["portfolio", "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "-n", "base"],
     "portfolio-bulk-tokens": [

@@ -217,3 +217,13 @@ def test_pricing_survives_provider_failures(monkeypatch):
     pricing.price_assets(assets)
     assert assets[0]["price_usd"] is None
     assert assets[0]["value_usd"] is None
+
+
+def test_native_assets_fall_back_to_defillama(monkeypatch):
+    monkeypatch.setattr(pricing.coingecko, "simple_price", lambda ids: {})
+    monkeypatch.setattr(
+        pricing.defillama, "token_prices", lambda pairs: {("coingecko", "tron"): {"price": 0.3, "confidence": 0.99}}
+    )
+    assets = [{"network": "tron", "symbol": "TRX", "token_address": None, "amount": "10", "coingecko_id": "tron"}]
+    pricing.price_assets(assets)
+    assert (assets[0]["price_source"], assets[0]["value_usd"]) == ("defillama", 3.0)

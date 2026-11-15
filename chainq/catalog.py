@@ -9,7 +9,8 @@ from chainq.errors import ChainqError
 from chainq.networks import NETWORKS
 from chainq.providers.coingecko_data import PLATFORM_IDS, SYMBOL_TO_ID
 from chainq.solana import is_solana_address
-from chainq.tokens import SOLANA_TOKENS, TOKENS
+from chainq.tokens import SOLANA_TOKENS, TOKENS, TRON_TOKENS
+from chainq.tron import is_tron_address
 
 COINGECKO_LIST_URL = "https://tokens.coingecko.com/{platform}/all.json"
 AAVE_LIST_URL = "https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/tokenlist.json"
@@ -73,6 +74,23 @@ def _load_source(name: str, url: str) -> object | None:
     return cache.get_blob(name)
 
 
+def _is_evm(network_key: str) -> bool:
+    return NETWORKS[network_key].kind == "evm"
+
+
+def _case_key(network_key: str, address: str) -> str:
+    return address.lower() if _is_evm(network_key) else address
+
+
+def _native_address(network_key: str, address: object) -> str | None:
+    kind = NETWORKS[network_key].kind
+    if kind == "solana":
+        return address if isinstance(address, str) and is_solana_address(address) else None
+    if kind == "tron":
+        return address if isinstance(address, str) and is_tron_address(address) else None
+    return _checksum(address)
+
+
 def _checksum(address: object) -> str | None:
     if not isinstance(address, str) or not address.startswith("0x") or len(address) != 42:
         return None
@@ -98,11 +116,9 @@ def _coingecko_tokens(network_key: str) -> list[CatalogToken]:
     entries = (data or {}).get("tokens") if isinstance(data, dict) else None
     tokens = []
     for entry in entries or []:
-        address = entry.get("address") if network_key == "solana" else _checksum(entry.get("address"))
+        address = _native_address(network_key, entry.get("address"))
         decimals = _decimals(entry.get("decimals"))
         if not address or decimals is None or not entry.get("symbol"):
-            continue
-        if network_key == "solana" and not is_solana_address(address):
             continue
         tokens.append(
             CatalogToken(network_key, address, str(entry["symbol"]), str(entry.get("name") or ""), decimals, "coingecko")
@@ -161,6 +177,8 @@ def _jupiter_tokens() -> list[CatalogToken]:
 def _registry_tokens(network_key: str) -> list[CatalogToken]:
     if network_key == "solana":
         entries = SOLANA_TOKENS.items()
+    elif network_key == "tron":
+        entries = TRON_TOKENS.items()
     else:
         entries = TOKENS.get(network_key, {}).items()
     return [
@@ -182,7 +200,7 @@ def _merge(kept: CatalogToken, other: CatalogToken) -> CatalogToken:
 def _dedupe(tokens: list[CatalogToken]) -> list[CatalogToken]:
     unique: dict[str, CatalogToken] = {}
     for token in tokens:
-        key = token.address if token.network == "solana" else token.address.lower()
+        key = _case_key(token.network, token.address)
         unique[key] = _merge(unique[key], token) if key in unique else token
     return list(unique.values())
 
@@ -193,6 +211,8 @@ def tokens_for(network_key: str) -> tuple[CatalogToken, ...]:
         return ()
     if network_key == "solana":
         return tuple(_dedupe(_registry_tokens("solana") + _coingecko_tokens("solana") + _jupiter_tokens()))
+    if network_key == "tron":
+        return tuple(_dedupe(_registry_tokens("tron") + _coingecko_tokens("tron")))
     return tuple(
         _dedupe(
             _registry_tokens(network_key)
@@ -204,10 +224,11 @@ def tokens_for(network_key: str) -> tuple[CatalogToken, ...]:
 
 
 def lookup(network_key: str, address: str) -> CatalogToken | None:
-    wanted = address if network_key == "solana" else address.lower()
+    if network_key not in NETWORKS:
+        return None
+    wanted = _case_key(network_key, address)
     for token in tokens_for(network_key):
-        candidate = token.address if network_key == "solana" else token.address.lower()
-        if candidate == wanted:
+        if _case_key(network_key, token.address) == wanted:
             return token
     return None
 
@@ -251,6 +272,8 @@ def search(query: str, network_key: str | None = None, limit: int = 20) -> list[
 def _blob_names(network_key: str) -> list[str]:
     if network_key == "solana":
         return ["catalog-coingecko-solana", "catalog-jupiter"]
+    if network_key == "tron":
+        return ["catalog-coingecko-tron"]
     names = [f"catalog-coingecko-{network_key}", "catalog-aave"]
     chain_id = NETWORKS[network_key].chain_id
     if chain_id in PENDLE_CHAIN_IDS:

@@ -10,20 +10,27 @@ from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import coingecko, uniswap
 from chainq.providers.uniswap_data import CHAIN_SLUGS
+from chainq.tron import is_tron_address
+
+
+def _is_contract(query: str) -> bool:
+    return coingecko.is_address(query) or coingecko.is_solana_mint(query) or is_tron_address(query)
 
 
 def _token_address_matches(query: str, candidate: str) -> bool:
-    if coingecko.is_solana_mint(query):
+    if not query.startswith("0x"):
         return candidate == query
     return candidate.lower() == query.lower()
 
 
 def _contract_lookup_key(address: str, network_key: str | None) -> str | None:
+    if is_tron_address(address):
+        return "tron"
     return "solana" if coingecko.is_solana_mint(address) else network_key
 
 
 def _dexscreener_chain_slug(network_key: str | None) -> str | None:
-    return "solana" if network_key == "solana" else CHAIN_SLUGS.get(network_key)
+    return network_key if network_key in ("solana", "tron") else CHAIN_SLUGS.get(network_key)
 
 
 def _dexscreener_best_pair(address: str, network_key: str | None) -> dict | None:
@@ -67,7 +74,7 @@ def _locate_contract(address: str, network_key: str | None) -> tuple[dict | None
 
 
 def _resolve_coin_id(query: str, network_key: str | None) -> str:
-    if coingecko.is_address(query) or coingecko.is_solana_mint(query):
+    if _is_contract(query):
         coin, _ = _locate_contract(query, network_key)
         if coin is None:
             raise ChainqError(f"no CoinGecko asset for contract {query}; historical data needs a listed asset")
@@ -130,7 +137,7 @@ def price(
     entries: list[tuple[str, str | None, dict | None]] = []
     ids = []
     for query in assets:
-        if coingecko.is_address(query) or coingecko.is_solana_mint(query):
+        if _is_contract(query):
             coin, best_pair = _locate_contract(query, network_key)
             if coin is None and best_pair is None:
                 raise ChainqError(f"no asset found for contract {query} on CoinGecko or DexScreener")
@@ -246,7 +253,7 @@ def asset(
     """Detailed asset profile: price, caps, supply, ATH, links."""
     out = Out(json_out, quiet, verbose, format)
     link_providers = configured_providers(links)
-    if coingecko.is_address(query) or coingecko.is_solana_mint(query):
+    if _is_contract(query):
         network_key = resolve_network(network).key if network else None
         c, _ = _locate_contract(query, network_key)
         if c is None:

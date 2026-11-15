@@ -46,7 +46,7 @@ def by_contract(address: str, network_key: str | None = None) -> dict | None:
         platform = PLATFORM_IDS.get(key)
         if platform is None:
             continue
-        contract_address = address if platform == "solana" else address.lower()
+        contract_address = address.lower() if address.startswith("0x") else address
         result = _get(f"/coins/{platform}/contract/{contract_address}", ttl=300, none_on_404=True)
         if result is not None:
             return result

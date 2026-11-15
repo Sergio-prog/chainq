@@ -87,6 +87,7 @@ PLATFORM_IDS = {
     "robinhood": "robinhood",
     "arc": "arc",
     "solana": "solana",
+    "tron": "tron",
 }
 
 CONTRACT_LOOKUP_ORDER = ("ethereum", "base", "arbitrum", "bsc", "polygon", "optimism", "avalanche", "hyperevm")

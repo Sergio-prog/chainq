@@ -4,7 +4,10 @@ from typing import Annotated
 import typer
 from web3 import Web3
 
-from chainq import catalog, pricing, solana
+from chainq import catalog, pricing, solana, tron
+from chainq.commands import tron_chain
+from chainq.commands.chain import _solana_symbol
+from chainq.commands.portfolio import scan_solana
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
@@ -187,65 +190,148 @@ def _evm_address(out: Out, target: str, net) -> None:
     )
 
 
+def _solana_parsed(info: dict | None) -> tuple[str | None, dict]:
+    data = (info or {}).get("data")
+    parsed = data.get("parsed") if isinstance(data, dict) else None
+    if not isinstance(parsed, dict):
+        return None, {}
+    return parsed.get("type"), parsed.get("info") or {}
+
+
+def _solana_kind(info: dict | None, parsed_type: str | None) -> str:
+    if info is None:
+        return "unfunded"
+    if info.get("executable"):
+        return "program"
+    if parsed_type in ("mint", "account"):
+        return "token_mint" if parsed_type == "mint" else "token_account"
+    return "wallet" if info.get("owner") == SYSTEM_PROGRAM else "account"
+
+
+def _solana_mint_profile(mint: str, details: dict) -> dict:
+    token = catalog.lookup("solana", mint)
+    decimals = details.get("decimals") or 0
+    return {
+        "symbol": token.symbol if token else None,
+        "name": token.name if token else None,
+        "decimals": decimals,
+        "total_supply": str(Decimal(int(details.get("supply") or 0)) / Decimal(10**decimals)),
+        "mint_authority": details.get("mintAuthority"),
+        "freeze_authority": details.get("freezeAuthority"),
+    }
+
+
+def _solana_holdings(addr: str) -> tuple[list[dict], int, float | None, Decimal]:
+    assets = pricing.price_assets(scan_solana(addr))
+    native = next((a for a in assets if a["token_address"] is None), None)
+    holdings = [
+        {k: a.get(k) for k in ("symbol", "token_address", "amount", "kind", "value_usd", "price_source")}
+        for a in assets
+        if a["token_address"] and a["value_usd"] is not None
+    ]
+    holdings.sort(key=lambda h: -h["value_usd"])
+    hidden = sum(1 for a in assets if a["token_address"] and a["value_usd"] is None)
+    native_price = native["price_usd"] if native else coingecko.try_price_usd("solana")
+    return holdings, hidden, native_price, Decimal(native["amount"]) if native else Decimal(0)
+
+
 def _solana_address(out: Out, target: str, net) -> None:
     addr = solana.resolve_solana_address(target)
     info = solana.account_info(addr)
-    lamports = (info or {}).get("lamports") or 0
-    amount = solana.lamports_to_sol(lamports)
-    price = coingecko.try_price_usd("solana")
-    value = float(amount) * price if price is not None else None
+    parsed_type, details = _solana_parsed(info)
+    kind = _solana_kind(info, parsed_type)
     owner = (info or {}).get("owner")
-    executable = bool((info or {}).get("executable"))
-    if info is None:
-        kind = "unfunded account"
-    elif executable:
-        kind = "program"
-    elif owner == SYSTEM_PROGRAM:
-        kind = "wallet (system account)"
+    upgrade_authority, deployed_slot = None, None
+    if kind == "program" and details.get("programData"):
+        upgrade_authority, deployed_slot = solana.program_data_header(details["programData"])
+    mint = _solana_mint_profile(addr, details) if kind == "token_mint" else None
+    token_account = None
+    if kind == "token_account":
+        amount = details.get("tokenAmount") or {}
+        token_account = {
+            "mint": details.get("mint"),
+            "symbol": _solana_symbol(details.get("mint")),
+            "owner": details.get("owner"),
+            "amount": amount.get("uiAmountString") or "0",
+        }
+    if kind in ("wallet", "account"):
+        holdings, hidden, price, amount = _solana_holdings(addr)
     else:
-        kind = f"account owned by {owner}"
-    accounts = [] if executable else [a for a in solana.token_accounts(addr) if a["raw_amount"]]
-    totals: dict[str, Decimal] = {}
-    names: dict[str, str] = {}
-    for account in accounts:
-        token = catalog.lookup("solana", account["mint"])
-        if token is not None:
-            names[account["mint"]] = token.symbol
-            totals[account["mint"]] = totals.get(account["mint"], Decimal(0)) + Decimal(account["amount"])
-    known = [{"symbol": names[mint], "mint": mint, "amount": str(total)} for mint, total in totals.items()]
+        holdings, hidden = [], 0
+        price = coingecko.try_price_usd("solana")
+        amount = solana.lamports_to_sol((info or {}).get("lamports") or 0)
+    value = float(amount) * price if price is not None else None
     data = {
         "address": addr,
         "input": target,
         "network": net.key,
-        "type": "program" if executable else ("wallet" if info else "unfunded"),
+        "type": kind,
         "owner_program": owner,
+        "owner_program_name": solana.PROGRAM_LABELS.get(owner) if owner else None,
+        "program_name": solana.PROGRAM_LABELS.get(addr) if kind == "program" else None,
+        "upgrade_authority": upgrade_authority,
+        "upgradeable": bool(details.get("programData")) if kind == "program" else None,
+        "last_deploy_slot": deployed_slot,
+        "mint": mint,
+        "token_account": token_account,
         "native_amount": str(amount),
         "native_value_usd": value,
-        "token_accounts": len(accounts),
-        "known_tokens": known,
+        "holdings": holdings,
+        "holdings_hidden": hidden,
         "explorer": f"{net.explorer}/account/{addr}",
     }
-    lines = [f"{short_addr(addr)} on Solana: {kind}"]
+    what = {
+        "unfunded": "unfunded account",
+        "wallet": "wallet (system account)",
+        "token_account": "SPL token account",
+        "account": f"account owned by {solana.PROGRAM_LABELS.get(owner, owner)}",
+    }.get(kind)
+    if kind == "program":
+        label = solana.PROGRAM_LABELS.get(addr)
+        what = f"program{f' ({label})' if label else ''}"
+        what += f", upgradeable by {upgrade_authority}" if upgrade_authority else (
+            ", immutable" if details.get("programData") else ""
+        )
+    if mint:
+        what = f"SPL token mint ({solana.PROGRAM_LABELS.get(owner, owner)})"
+    lines = [f"{short_addr(addr)} on Solana: {what}"]
+    if mint:
+        lines.append(
+            f"  token: {mint['name'] or mint['symbol'] or short_addr(addr)}"
+            + (f" ({mint['symbol']})" if mint["symbol"] else "")
+            + f", {mint['decimals']} decimals, supply {fmt_amount(mint['total_supply'])}"
+        )
+        lines.append(
+            f"  mint authority: {mint['mint_authority'] or 'none (fixed supply)'}, "
+            f"freeze authority: {mint['freeze_authority'] or 'none'}"
+        )
+    if token_account:
+        lines.append(
+            f"  holds {fmt_amount(token_account['amount'])} {token_account['symbol']} for {token_account['owner']}"
+        )
     native_line = f"  native: {fmt_amount(amount)} SOL"
     if value is not None:
         native_line += f" (~{fmt_usd(value)})"
     lines.append(native_line)
-    if accounts:
-        shown = ", ".join(f"{fmt_amount(a['amount'])} {a['symbol']}" for a in known[:5])
-        summary = f"  token accounts: {len(accounts)}"
-        if shown:
-            summary += f" — {shown}"
-        lines.append(summary)
+    if holdings:
+        shown = ", ".join(f"{fmt_amount(h['amount'])} {h['symbol']} (~{fmt_usd(h['value_usd'])})" for h in holdings[:5])
+        more = f" (+{len(holdings) - 5} more)" if len(holdings) > 5 else ""
+        unpriced = f" ({hidden} unpriced hidden)" if hidden else ""
+        lines.append(f"  tokens: {shown}{more}{unpriced}")
     out.emit(
         data,
         lines,
-        quiet_value=data["type"],
-        verbose_lines=[f"owner program: {owner}", f"explorer: {data['explorer']}"],
+        quiet_value=kind,
+        verbose_lines=[
+            f"owner program: {owner}",
+            *([f"last deploy slot: {deployed_slot}"] if deployed_slot else []),
+            f"explorer: {data['explorer']}",
+        ],
     )
 
 
 def address(
-    target: Annotated[str, typer.Argument(help="address (0x or Solana base58), ENS, or .sol name")],
+    target: Annotated[str, typer.Argument(help="address (0x, Solana base58, Tron T…), ENS, or .sol name")],
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -255,10 +341,14 @@ def address(
     """Inspect an address: EOA vs contract vs program, proxies, activity, holdings."""
     out = Out(json_out, quiet, verbose, format)
     value = target.strip()
+    if tron.looks_like_tron(value):
+        return tron_chain.address(out, value, resolve_network("tron"))
     if solana.looks_like_solana(value):
         net = resolve_network("solana")
         return _solana_address(out, value, net)
     net = resolve_network(network)
     if net.kind == "solana":
         return _solana_address(out, value, net)
+    if net.kind == "tron":
+        return tron_chain.address(out, value, net)
     _evm_address(out, value, net)

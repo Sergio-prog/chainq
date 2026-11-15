@@ -38,6 +38,9 @@ CHAIN_SLUGS = {
     "katana": "katana",
     "robinhood": "robinhood",
     "arc": "arc",
+    "solana": "solana",
+    "tron": "tron",
+    "coingecko": "coingecko",
 }
 
 

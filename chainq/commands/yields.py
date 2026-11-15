@@ -278,6 +278,8 @@ def _tasks(networks: list[str]) -> list[Task]:
         if net.kind == "solana":
             tasks.append(("kamino solana", _kamino_rows))
             continue
+        if net.kind != "evm":
+            continue
         tasks.extend(
             [
                 (f"aave {network}", lambda network=network: _aave_rows(network)),
