@@ -9,7 +9,8 @@ from web3 import Web3
 from web3.exceptions import TransactionNotFound
 from web3.types import RPCEndpoint
 
-from chainq import catalog, pricing, solana
+from chainq import catalog, pricing, solana, tron
+from chainq.commands import tron_chain
 from chainq.errors import ChainqError
 from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
@@ -94,6 +95,15 @@ def _token_price(net, symbol: str, token_address: str, amount: Decimal) -> tuple
     return asset["price_usd"], asset["price_source"]
 
 
+def _detect_network(net, value: str):
+    value = value.strip()
+    if net.kind == "evm" and tron.looks_like_tron(value):
+        return resolve_network("tron")
+    if net.kind == "evm" and solana.looks_like_solana(value):
+        return resolve_network("solana")
+    return net
+
+
 def _solana_balance(address: str, coin: str | None, net) -> tuple[str, Decimal, str, str | None, float | None, str]:
     addr = solana.resolve_solana_address(address)
     if coin is None:
@@ -109,7 +119,7 @@ def _solana_balance(address: str, coin: str | None, net) -> tuple[str, Decimal, 
 
 
 def balance(
-    address: Annotated[str, typer.Argument(help="wallet address (0x or Solana base58), ENS, or .sol name")],
+    address: Annotated[str, typer.Argument(help="wallet address (0x, Solana base58, Tron T…), ENS, or .sol name")],
     coin: Annotated[
         str | None, typer.Option("--coin", "-c", help="token symbol or contract/mint address; omit for native")
     ] = None,
@@ -121,12 +131,13 @@ def balance(
 ):
     """Get native or token balance of an address."""
     out = Out(json_out, quiet, verbose, format)
-    net = resolve_network(network)
-    if net.kind != "solana" and solana.looks_like_solana(address):
-        net = resolve_network("solana")
+    net = _detect_network(resolve_network(network), address)
     if net.kind == "solana":
         addr, amount, symbol, token_address, price, price_source = _solana_balance(address, coin, net)
         rpc_note = "solana rpc"
+    elif net.kind == "tron":
+        addr, amount, symbol, token_address, price, price_source = tron_chain.balance(address, coin, net)
+        rpc_note = "tron full-node http api"
     else:
         addr = resolve_address(address)
         client = connect(net)
@@ -172,8 +183,10 @@ def balance(
 
 
 def _solana_gas(out: Out, net) -> None:
-    fees = solana.recent_prioritization_fees()
+    fees = sorted(solana.recent_prioritization_fees())
     priority_median = median(fees) if fees else 0
+    priority_p75 = fees[int(len(fees) * 0.75)] if fees else 0
+    priority_p90 = fees[int(len(fees) * 0.9)] if fees else 0
     transfer_lamports = solana.BASE_FEE_LAMPORTS + priority_median * 200_000 / 1e6
     price = coingecko.try_price_usd("solana")
     transfer_cost_usd = float(solana.lamports_to_sol(int(transfer_lamports))) * price if price is not None else None
@@ -181,13 +194,16 @@ def _solana_gas(out: Out, net) -> None:
         "network": net.key,
         "base_fee_lamports": solana.BASE_FEE_LAMPORTS,
         "priority_fee_median_microlamports_per_cu": priority_median,
+        "priority_fee_p75_microlamports_per_cu": priority_p75,
+        "priority_fee_p90_microlamports_per_cu": priority_p90,
         "est_transfer_fee_lamports": transfer_lamports,
         "native_price_usd": price,
         "transfer_cost_usd": transfer_cost_usd,
     }
     text = (
         f"Solana fees: base {solana.BASE_FEE_LAMPORTS} lamports/signature, "
-        f"median priority {fmt_amount(priority_median)} µlamports/CU"
+        f"priority p50 {fmt_amount(priority_median)} / p75 {fmt_amount(priority_p75)} / "
+        f"p90 {fmt_amount(priority_p90)} µlamports/CU"
     )
     if transfer_cost_usd is not None:
         text += f" — simple transfer ≈ {fmt_usd(transfer_cost_usd)}"
@@ -206,6 +222,8 @@ def gas(
     net = resolve_network(network)
     if net.kind == "solana":
         return _solana_gas(out, net)
+    if net.kind == "tron":
+        return tron_chain.gas(out, net)
     client = connect(net)
     gas_price = client.w3.eth.gas_price
     base_fee = None
@@ -238,6 +256,25 @@ def gas(
     out.emit(data, text, quiet_value=gas_price / 1e9, verbose_lines=[f"rpc: {client.url}"])
 
 
+def _solana_symbol(mint: str | None) -> str:
+    if mint is None:
+        return "SOL"
+    token = catalog.lookup("solana", mint)
+    return token.symbol if token else short_addr(mint)
+
+
+def _solana_amount(raw: int, decimals: int | None) -> Decimal:
+    return Decimal(raw) / Decimal(10**decimals) if decimals is not None else Decimal(raw)
+
+
+def _solana_kind(transfers: list[dict], main: str | None) -> str:
+    if main and main.startswith("System transfer"):
+        return "sol_transfer"
+    if main and main.startswith(("SPL Token transfer", "Token-2022 transfer")):
+        return "spl_transfer"
+    return "program_call" if main else "unknown"
+
+
 def _solana_tx(out: Out, signature: str, net) -> None:
     if not solana.is_signature(signature):
         raise ChainqError(f"'{signature}' is not a valid Solana transaction signature (base58, 64 bytes)")
@@ -247,6 +284,7 @@ def _solana_tx(out: Out, signature: str, net) -> None:
     meta = txn.get("meta") or {}
     status = "failed" if meta.get("err") else "success"
     fee = solana.lamports_to_sol(meta.get("fee") or 0)
+    priority_fee = solana.lamports_to_sol(solana.priority_fee_lamports(txn))
     message = (txn.get("transaction") or {}).get("message") or {}
     account_keys = message.get("accountKeys") or []
     signer = next((k.get("pubkey") for k in account_keys if isinstance(k, dict) and k.get("signer")), None)
@@ -256,15 +294,44 @@ def _solana_tx(out: Out, signature: str, net) -> None:
     signer_change = solana.lamports_to_sol(post[0] - pre[0]) if pre and post else None
     timestamp = datetime.fromtimestamp(txn["blockTime"], tz=UTC) if txn.get("blockTime") else None
     price = coingecko.try_price_usd("solana")
+    main = solana.main_instruction(txn)
+    transfers = [
+        {
+            "token": row["mint"],
+            "symbol": _solana_symbol(row["mint"]),
+            "amount": float(_solana_amount(row["raw_amount"], row["decimals"])),
+            "from": row["from"],
+            "to": row["to"],
+        }
+        for row in solana.decode_transfers(txn)
+    ]
+    value = sum((Decimal(str(t["amount"])) for t in transfers if t["token"] is None and t["from"] == signer), Decimal(0))
+    token_changes = [
+        {
+            "token": change["mint"],
+            "symbol": _solana_symbol(change["mint"]),
+            "change": str(_solana_amount(change["raw_change"], change["decimals"])),
+        }
+        for change in (solana.owner_token_changes(txn, signer) if signer else [])
+    ]
     data = {
         "hash": signature,
         "network": net.key,
         "status": status,
+        "kind": _solana_kind(transfers, main),
         "from": signer,
+        "function": main,
         "programs": programs,
+        "program_names": [solana.PROGRAM_LABELS.get(p, p) for p in programs if p],
+        "value": str(value),
+        "value_usd": float(value) * price if price is not None else None,
         "signer_sol_change": str(signer_change) if signer_change is not None else None,
+        "signer_token_changes": token_changes,
         "fee": str(fee),
         "fee_usd": float(fee) * price if price is not None else None,
+        "priority_fee": str(priority_fee),
+        "compute_units": meta.get("computeUnitsConsumed"),
+        "token_transfers": transfers,
         "slot": txn.get("slot"),
         "timestamp": timestamp.isoformat() if timestamp else None,
         "explorer": f"{net.explorer}/tx/{signature}",
@@ -273,8 +340,21 @@ def _solana_tx(out: Out, signature: str, net) -> None:
         f"Tx {short_addr(signature)} on Solana: {status}",
         f"  signer {signer or 'unknown'}"
         + (f", SOL change {fmt_amount(signer_change)}" if signer_change is not None else ""),
-        f"  fee {fmt_amount(fee)} SOL" + (f" (~{fmt_usd(data['fee_usd'])})" if data["fee_usd"] else ""),
+        f"  fee {fmt_amount(fee)} SOL" + (f" (~{fmt_usd(data['fee_usd'])})" if data["fee_usd"] else "")
+        + (f", priority {fmt_amount(priority_fee)} SOL" if priority_fee else ""),
     ]
+    if main:
+        lines.append(f"  calls {main}")
+    if token_changes:
+        lines.append("  signer tokens: " + ", ".join(f"{fmt_amount(c['change'])} {c['symbol']}" for c in token_changes))
+    if transfers:
+        lines.append("  transfers:")
+        for row in transfers[:TEXT_TRANSFER_LIMIT]:
+            arrow = f"{short_addr(row['from'] or '?')} → {short_addr(row['to'] or '?')}"
+            lines.append(f"    {fmt_amount(row['amount'])} {row['symbol']}: {arrow}")
+        hidden = len(transfers) - TEXT_TRANSFER_LIMIT
+        if hidden > 0:
+            lines.append(f"    … +{hidden} more transfers (--json lists all)")
     if data["slot"] is not None:
         when = f" at {timestamp.strftime('%Y-%m-%d %H:%M UTC')}" if timestamp else ""
         lines.append(f"  slot {data['slot']}{when}")
@@ -282,7 +362,11 @@ def _solana_tx(out: Out, signature: str, net) -> None:
         data,
         lines,
         quiet_value=status,
-        verbose_lines=[f"programs: {', '.join(p for p in programs if p)}", f"explorer: {data['explorer']}"],
+        verbose_lines=[
+            f"programs: {', '.join(data['program_names'])}",
+            f"compute units: {data['compute_units']}",
+            f"explorer: {data['explorer']}",
+        ],
     )
 
 
@@ -334,7 +418,7 @@ def _decode_transfers(client, receipt) -> list[dict]:
 
 
 def tx(
-    tx_hash: Annotated[str, typer.Argument(help="transaction hash (or Solana signature)")],
+    tx_hash: Annotated[str, typer.Argument(help="transaction hash, Solana signature, or Tron txid")],
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -346,8 +430,12 @@ def tx(
     net = resolve_network(network)
     if net.kind != "solana" and solana.is_signature(tx_hash.strip()):
         net = resolve_network("solana")
+    if net.kind == "evm" and not tx_hash.strip().startswith("0x") and tron.is_txid(tx_hash):
+        net = resolve_network("tron")
     if net.kind == "solana":
         return _solana_tx(out, tx_hash, net)
+    if net.kind == "tron":
+        return tron_chain.tx(out, tx_hash, net)
     client = connect(net)
     try:
         transaction = client.w3.eth.get_transaction(tx_hash)
@@ -433,7 +521,9 @@ def tx(
 
 
 def rpc(
-    method: Annotated[str, typer.Argument(help="JSON-RPC method, e.g. eth_blockNumber or getSlot")],
+    method: Annotated[
+        str, typer.Argument(help="JSON-RPC method (eth_blockNumber, getSlot) or Tron HTTP API path (getnowblock)")
+    ],
     params: Annotated[list[str] | None, typer.Argument(help="params; JSON literals are parsed, rest stay strings")] = None,
     network: NetworkOpt = "ethereum",
 ):
@@ -448,6 +538,8 @@ def rpc(
     if net.kind == "solana":
         print(json.dumps(solana.rpc_call(method, parsed), indent=2, default=str))
         return
+    if net.kind == "tron":
+        return tron_chain.rpc(method, parsed)
     client = connect(net)
     response = client.w3.provider.make_request(RPCEndpoint(method), parsed)
     if "error" in response:

@@ -410,6 +410,21 @@ NETWORKS: dict[str, Network] = {
             aliases=("sol",),
             kind="solana",
         ),
+        Network(
+            key="tron",
+            name="Tron",
+            chain_id=728126428,
+            native_symbol="TRX",
+            native_coingecko_id="tron",
+            rpc_urls=(
+                "https://api.trongrid.io",
+                "https://tron-rpc.publicnode.com",
+                "https://api.tronstack.io",
+            ),
+            explorer="https://tronscan.org/#",
+            aliases=("trx", "tron-mainnet"),
+            kind="tron",
+        ),
     )
 }
 

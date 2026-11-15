@@ -4,6 +4,7 @@ from chainq.providers.uniswap_data import CHAIN_SLUGS
 
 DEX_MIN_LIQUIDITY_USD = 1000
 PENDLE_FRESH_SECONDS = 3600
+DEXSCREENER_SLUGS = {**CHAIN_SLUGS, "solana": "solana", "tron": "tron"}
 
 
 def _unpriced(assets: list[dict]) -> list[dict]:
@@ -29,18 +30,37 @@ def _price_coingecko(assets: list[dict]) -> None:
         _apply(asset, price, "coingecko" if price is not None else None)
 
 
+def _defillama_key(asset: dict) -> tuple[str, str] | None:
+    if asset.get("token_address"):
+        return asset["network"], asset["token_address"]
+    if asset.get("coingecko_id"):
+        return "coingecko", asset["coingecko_id"]
+    return None
+
+
 def _price_defillama(assets: list[dict]) -> None:
-    targets = [a for a in assets if a["network"] != "solana" and a.get("token_address")]
+    targets = [(a, key) for a in assets if (key := _defillama_key(a))]
     if not targets:
         return
     try:
-        prices = defillama.token_prices([(a["network"], a["token_address"]) for a in targets])
+        prices = defillama.token_prices(sorted({key for _, key in targets}))
     except Exception:
         return
-    for asset in targets:
-        hit = prices.get((asset["network"], asset["token_address"]))
+    for asset, key in targets:
+        hit = prices.get(key)
         if hit:
             _apply(asset, hit["price"], "defillama")
+
+
+def native_price(coingecko_id: str) -> float | None:
+    price = coingecko.try_price_usd(coingecko_id)
+    if price is not None:
+        return price
+    try:
+        hit = defillama.token_prices([("coingecko", coingecko_id)]).get(("coingecko", coingecko_id))
+    except Exception:
+        return None
+    return hit["price"] if hit else None
 
 
 def _price_jupiter(assets: list[dict]) -> None:
@@ -67,11 +87,11 @@ def _price_pendle(assets: list[dict]) -> None:
 def _price_dexscreener(assets: list[dict]) -> None:
     by_network: dict[str, list[dict]] = {}
     for asset in assets:
-        if asset.get("token_address") and CHAIN_SLUGS.get(asset["network"]):
+        if asset.get("token_address") and DEXSCREENER_SLUGS.get(asset["network"]):
             by_network.setdefault(asset["network"], []).append(asset)
     for network_key, targets in by_network.items():
         try:
-            pairs = uniswap.token_pairs_batch(CHAIN_SLUGS[network_key], [a["token_address"] for a in targets])
+            pairs = uniswap.token_pairs_batch(DEXSCREENER_SLUGS[network_key], [a["token_address"] for a in targets])
         except Exception:
             continue
         best: dict[str, dict] = {}
@@ -93,8 +113,8 @@ def price_assets(assets: list[dict]) -> list[dict]:
         asset.setdefault("price_source", None)
         asset.setdefault("value_usd", None)
     _price_coingecko([a for a in assets if a.get("coingecko_id")])
-    _price_defillama(_unpriced(assets))
     _price_jupiter(_unpriced(assets))
+    _price_defillama(_unpriced(assets))
     _price_pendle(_unpriced(assets))
     _price_dexscreener(_unpriced(assets))
     for asset in assets:

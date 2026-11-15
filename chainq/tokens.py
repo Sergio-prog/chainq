@@ -1,5 +1,6 @@
 from chainq.networks import Network
 from chainq.solana import is_solana_address
+from chainq.tron import looks_like_tron, resolve_tron_address
 
 TOKENS: dict[str, dict[str, str]] = {
     "ethereum": {
@@ -88,6 +89,25 @@ SOLANA_TOKENS: dict[str, str] = {
     "jitosol": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
 }
 
+TRON_TOKENS: dict[str, str] = {
+    "usdt": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+    "usdc": "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8",
+    "usdd": "TXDk8mbtRbXeYuMNS83CfKPaYYT8XWv9Hz",
+    "usd1": "TPFqcBAaaUMCSVRCqPaQ9QnzKhmuoLR6Rc",
+    "tusd": "TUpMhErZL2fhh4sVNULAbNKLokS4GjC1F4",
+    "stusdt": "TThzxNRLrW2Brp9DcTQU8i4Wd9udCWEdZ3",
+    "wtrx": "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR",
+    "strx": "TU3kjFuhtEo42tsCBtfYUAZxoqQ4yuSLQ5",
+    "wbtc": "TXpw8XeWYeTUd4quDskoUqeQPowRh4jY65",
+    "eth": "THb4CqiFdwNHsWsQCs4JhzwjMWys4aqCbF",
+    "jst": "TCFLL5dx5ZJdKnWuesXxi1VPwjLVmWZZy9",
+    "sun": "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+    "btt": "TAFjULxiVgT4qWk6UZwjqwZXTSaGaqnVp4",
+    "win": "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7",
+    "htx": "TUPM7K8REVzD2UdV4R5fe5M8XbnR2DdoJ6",
+    "nft": "TFczxzPhnThNSqr5by8tvxsdCFRRz6cPNq",
+}
+
 MINT_TO_SYMBOL: dict[str, str] = {mint: symbol for symbol, mint in SOLANA_TOKENS.items()}
 
 
@@ -98,6 +118,13 @@ def resolve_token(coin: str, network: Network) -> str:
             return mint
         if is_solana_address(coin.strip()):
             return coin.strip()
+        return _catalog_address(network, coin)
+    if network.kind == "tron":
+        address = TRON_TOKENS.get(coin.strip().lower())
+        if address is not None:
+            return address
+        if looks_like_tron(coin.strip()):
+            return resolve_tron_address(coin)
         return _catalog_address(network, coin)
     if coin.startswith("0x") and len(coin) == 42:
         return coin

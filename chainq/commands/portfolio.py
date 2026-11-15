@@ -13,7 +13,8 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
-from chainq import cache, catalog, pricing, solana
+from chainq import cache, catalog, pricing, solana, tron
+from chainq.commands import tron_chain
 from chainq.errors import ChainqError
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
@@ -95,7 +96,7 @@ def _scan_evm(net_key: str, address: str) -> list[dict]:
     return assets
 
 
-def _scan_solana(address: str) -> list[dict]:
+def scan_solana(address: str) -> list[dict]:
     assets = []
     lamports = solana.get_balance(address)
     if lamports:
@@ -128,7 +129,9 @@ def _scan_solana(address: str) -> list[dict]:
 
 def _scan_network(net_key: str, address: str) -> list[dict]:
     if NETWORKS[net_key].kind == "solana":
-        return _scan_solana(address)
+        return scan_solana(address)
+    if NETWORKS[net_key].kind == "tron":
+        return tron_chain.scan_assets(address)
     return _scan_evm(net_key, address)
 
 
@@ -220,21 +223,24 @@ def _scan_lighter(address: str) -> list[dict]:
     return assets
 
 
+ADDRESS_KINDS = {"evm": "0x EVM address", "solana": "base58 Solana pubkey", "tron": "base58 Tron address"}
+
+
 def _resolve_scan_target(address: str, networks: list[str] | None) -> tuple[str, list[str]]:
     value = address.strip()
-    if solana.looks_like_solana(value):
+    requested = [resolve_network(n) for n in networks or []]
+    if tron.looks_like_tron(value) or (requested and all(n.kind == "tron" for n in requested)):
+        kind, addr = "tron", tron.resolve_tron_address(value)
+    elif solana.looks_like_solana(value):
         kind, addr = "solana", solana.resolve_solana_address(value)
     else:
         kind, addr = "evm", resolve_address(value)
-    if networks:
-        requested = [resolve_network(n) for n in networks]
-        mismatched = [n.key for n in requested if n.kind != kind]
-        if mismatched:
-            raise ChainqError(
-                f"{', '.join(mismatched)} cannot hold this address "
-                f"({'base58 Solana pubkey' if kind == 'solana' else '0x EVM address'})"
-            )
-        return addr, [n.key for n in requested]
+    if requested:
+        compatible = [n.key for n in requested if n.kind == kind]
+        if not compatible:
+            names = ", ".join(n.key for n in requested)
+            raise ChainqError(f"{names} cannot hold this address ({ADDRESS_KINDS[kind]})")
+        return addr, compatible
     return addr, [key for key, net in NETWORKS.items() if net.kind == kind]
 
 
@@ -422,10 +428,18 @@ def _sort_wallets(wallets: list[dict], sort: str) -> list[dict]:
     return wallets
 
 
+def _wallet_url(addr: str) -> str:
+    if addr.startswith("0x"):
+        return f"https://debank.com/profile/{addr}"
+    if tron.is_tron_address(addr):
+        return tron.explorer_address(addr)
+    return f"https://solscan.io/account/{addr}"
+
+
 def _wallet_cell(wallet: dict, short: bool) -> Text:
     addr = wallet["address"]
     text = short_addr(addr) if short else addr
-    url = f"https://debank.com/profile/{addr}" if addr.startswith("0x") else None
+    url = _wallet_url(addr)
     return Text(text, style=Style(color="cyan", link=url))
 
 
@@ -515,7 +529,7 @@ def _token_view(wallets: list[dict], short: bool) -> tuple[dict, Table]:
 def portfolio(
     addresses: Annotated[
         list[str] | None,
-        typer.Argument(help="wallet address(es) (0x or Solana base58), ENS, or .sol names; - reads stdin"),
+        typer.Argument(help="wallet address(es) (0x, Solana base58, Tron T…), ENS, or .sol names; - reads stdin"),
     ] = None,
     file: Annotated[
         str | None, typer.Option("--file", "-F", help="file with addresses (one per line, commas ok); - for stdin")
@@ -604,6 +618,6 @@ def portfolio(
         verbose_lines=[
             f"scanned {len(wallets)} wallet(s) × {len(keys)} network(s)" + (" + Hyperliquid + Lighter" if defi else ""),
             _cache_note(cache_hits),
-            "links: wallet labels open DeBank in terminals with OSC 8 hyperlink support",
+            "links: wallet labels open DeBank/Solscan/Tronscan in terminals with OSC 8 hyperlink support",
         ],
     )

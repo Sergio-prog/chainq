@@ -75,3 +75,75 @@ def test_looks_like_solana():
     assert looks_like_solana(USDC_MINT)
     assert not looks_like_solana("vitalik.eth")
     assert not looks_like_solana("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
+
+
+SIGNER = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"
+RECEIVER = "8DfHuYFv7VQ6wgcGtVDN2vtFn5ezFwvcFTVd5nGwm8hU"
+SOURCE_ATA = "2NmZRs9y7UxJj8hauYiErTX9r2pNASYPSZ9xFUgChVNu"
+DEST_ATA = "HF4AV2vKNigai3oNXoNc1tiVuz5ZsmiAr6yVTqNGW4cF"
+
+
+def _balance(index, owner, amount):
+    return {
+        "accountIndex": index,
+        "mint": USDC_MINT,
+        "owner": owner,
+        "uiTokenAmount": {"amount": str(amount), "decimals": 6},
+    }
+
+
+TXN = {
+    "transaction": {
+        "signatures": ["sig"],
+        "message": {
+            "accountKeys": [{"pubkey": SIGNER, "signer": True}, {"pubkey": SOURCE_ATA}, {"pubkey": DEST_ATA}],
+            "instructions": [
+                {"programId": "ComputeBudget111111111111111111111111111111", "data": "x"},
+                {
+                    "program": "spl-token",
+                    "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                    "parsed": {
+                        "type": "transfer",
+                        "info": {"source": SOURCE_ATA, "destination": DEST_ATA, "amount": "2500000", "authority": SIGNER},
+                    },
+                },
+            ],
+        },
+    },
+    "meta": {
+        "fee": 7000,
+        "innerInstructions": [
+            {
+                "index": 1,
+                "instructions": [
+                    {
+                        "program": "system",
+                        "parsed": {
+                            "type": "transfer",
+                            "info": {"source": SIGNER, "destination": RECEIVER, "lamports": 1_000_000_000},
+                        },
+                    }
+                ],
+            }
+        ],
+        "preTokenBalances": [_balance(1, SIGNER, 5_000_000), _balance(2, RECEIVER, 0)],
+        "postTokenBalances": [_balance(1, SIGNER, 2_500_000), _balance(2, RECEIVER, 2_500_000)],
+    },
+}
+
+
+def test_decode_transfers_resolves_owners_and_inner_instructions():
+    from chainq.solana import decode_transfers
+
+    assert decode_transfers(TXN) == [
+        {"mint": USDC_MINT, "raw_amount": 2_500_000, "decimals": 6, "from": SIGNER, "to": RECEIVER},
+        {"mint": None, "raw_amount": 1_000_000_000, "decimals": 9, "from": SIGNER, "to": RECEIVER},
+    ]
+
+
+def test_owner_changes_priority_fee_and_main_instruction():
+    from chainq.solana import main_instruction, owner_token_changes, priority_fee_lamports
+
+    assert owner_token_changes(TXN, SIGNER) == [{"mint": USDC_MINT, "raw_change": -2_500_000, "decimals": 6}]
+    assert priority_fee_lamports(TXN) == 2000
+    assert main_instruction(TXN) == "SPL Token transfer"
