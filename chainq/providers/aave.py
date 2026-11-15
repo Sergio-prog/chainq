@@ -37,3 +37,24 @@ def markets(chain_id: int) -> list[dict]:
         return result
 
     return cache.remember(("aave-markets", chain_id), 60, fetch)
+
+
+def market_label(name: str) -> str:
+    return name.removeprefix("AaveV3") or name
+
+
+def reserve_row(market: dict, reserve: dict) -> dict:
+    supply = reserve.get("supplyInfo") or {}
+    borrow = reserve.get("borrowInfo") or {}
+    return {
+        "market": market_label(market["name"]),
+        "symbol": (reserve.get("underlyingToken") or {}).get("symbol"),
+        "supply_apy_pct": float(supply["apy"]["value"]) * 100 if supply.get("apy") else None,
+        "borrow_apy_pct": float(borrow["apy"]["value"]) * 100 if borrow.get("apy") else None,
+        "supplied_usd": float(reserve["size"]["usd"]) if reserve.get("size") else None,
+        "borrowed_usd": float(borrow["total"]["usd"]) if borrow.get("total") else None,
+        "available_usd": float(borrow["availableLiquidity"]["usd"]) if borrow.get("availableLiquidity") else None,
+        "utilization_pct": float(borrow["utilizationRate"]["value"]) * 100 if borrow.get("utilizationRate") else None,
+        "collateral": supply.get("canBeCollateral"),
+        "frozen": reserve.get("isFrozen"),
+    }

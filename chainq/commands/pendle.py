@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
@@ -16,28 +15,6 @@ SORT_KEYS = {
     "implied-apy": lambda m: m["implied_apy_pct"] or 0,
     "expiry": lambda m: -(m["days_to_expiry"] or 0),
 }
-
-
-def _market_row(market: dict) -> dict:
-    details = market.get("details") or {}
-    expiry = market.get("expiry")
-    days = None
-    if expiry:
-        expiry_dt = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
-        days = (expiry_dt - datetime.now(UTC)).days
-    apy = details.get("impliedApy")
-    aggregated = details.get("aggregatedApy")
-    return {
-        "name": market.get("name"),
-        "expiry": str(expiry)[:10] if expiry else None,
-        "days_to_expiry": days,
-        "implied_apy_pct": apy * 100 if apy is not None else None,
-        "aggregated_apy_pct": aggregated * 100 if aggregated is not None else None,
-        "liquidity_usd": details.get("liquidity"),
-        "prime": market.get("isPrime"),
-        "address": market.get("address"),
-        "categories": market.get("categoryIds") or [],
-    }
 
 
 def _market_line(m: dict) -> str:
@@ -65,7 +42,7 @@ def markets(
     if sort not in SORT_KEYS:
         raise ChainqError(f"unknown sort '{sort}' (use: {', '.join(SORT_KEYS)})")
     net = resolve_network(network)
-    rows = [_market_row(m) for m in pendle.active_markets(net.chain_id)]
+    rows = [pendle.market_row(m) for m in pendle.active_markets(net.chain_id)]
     if not rows:
         raise ChainqError(f"no active Pendle markets on {net.name}")
     if coin:

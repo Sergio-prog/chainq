@@ -1,3 +1,4 @@
+import math
 import re
 
 from chainq import cache, http
@@ -33,3 +34,42 @@ def reserve_metrics(market: str) -> list[dict]:
     if not isinstance(result, list):
         raise ChainqError("Kamino API returned an invalid reserve list")
     return result
+
+
+def _number(value: object) -> float:
+    if value is None or isinstance(value, bool):
+        raise ValueError
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError
+    return number
+
+
+def reserve_row(market: dict, reserve: dict) -> dict | None:
+    if not isinstance(market, dict) or not isinstance(reserve, dict):
+        return None
+    try:
+        market_name = market.get("name")
+        market_address = market.get("lendingMarket")
+        symbol = reserve.get("liquidityToken")
+        mint = reserve.get("liquidityTokenMint")
+        reserve_address = reserve.get("reserve")
+        if not all(isinstance(value, str) and value for value in (market_name, market_address, symbol, mint, reserve_address)):
+            return None
+        supplied_usd = _number(reserve.get("totalSupplyUsd"))
+        borrowed_usd = _number(reserve.get("totalBorrowUsd"))
+        return {
+            "market": market_name,
+            "market_address": market_address,
+            "symbol": symbol,
+            "mint": mint,
+            "supply_apy_pct": _number(reserve.get("supplyApy")) * 100,
+            "borrow_apy_pct": _number(reserve.get("borrowApy")) * 100,
+            "supplied_usd": supplied_usd,
+            "borrowed_usd": borrowed_usd,
+            "utilization_pct": borrowed_usd / supplied_usd * 100 if supplied_usd else None,
+            "max_ltv_pct": _number(reserve.get("maxLtv")) * 100,
+            "reserve_address": reserve_address,
+        }
+    except (TypeError, ValueError, OverflowError):
+        return None
