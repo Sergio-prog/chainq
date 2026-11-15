@@ -20,6 +20,19 @@ VerboseOpt = Annotated[bool, typer.Option("--verbose", "-v", help="extra detail 
 FormatOpt = Annotated[str, typer.Option("--format", "-f", help="output format: text | json | table | toon")]
 
 
+FLOAT_DIGITS = 10
+
+
+def tidy_floats(value: object) -> object:
+    if isinstance(value, float):
+        return float(f"{value:.{FLOAT_DIGITS}g}")
+    if isinstance(value, dict):
+        return {key: tidy_floats(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [tidy_floats(item) for item in value]
+    return value
+
+
 def dim_label(line: str) -> str:
     if line.lstrip().startswith(("{", "[")):
         return line
@@ -157,6 +170,8 @@ class Out:
         quiet_value: object | None = None,
         verbose_lines: Iterable[str] = (),
     ) -> None:
+        if self.format != "text":
+            data = tidy_floats(data)
         if self.format == "json":
             print(json.dumps(data, indent=2, default=str))
             return

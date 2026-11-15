@@ -53,3 +53,10 @@ def test_unknown_format_rejected():
 
 def test_json_flag_wins():
     assert Out(json=True, format="table").format == "json"
+
+
+def test_tidy_floats_drops_binary_noise_only():
+    from chainq.output import tidy_floats
+
+    data = {"oi": 17955802.399999995, "rows": [{"p": 1.2345678901234e-9, "n": 3, "s": "x"}]}
+    assert tidy_floats(data) == {"oi": 17955802.4, "rows": [{"p": 1.23456789e-9, "n": 3, "s": "x"}]}
