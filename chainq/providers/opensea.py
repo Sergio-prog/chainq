@@ -1,4 +1,3 @@
-
 from chainq import cache, http
 from chainq.config import settings
 from chainq.errors import ChainqError
@@ -6,8 +5,6 @@ from chainq.http import UpstreamError
 
 BASE_URL = "https://api.opensea.io/api/v2"
 KEY_HINT = "get a key at https://docs.opensea.io and run `chainq config set opensea-api-key <key>`"
-
-TOP_SORTS = ("one_day_volume", "seven_day_volume", "market_cap", "num_owners")
 
 
 def _error_message(resp) -> str:
