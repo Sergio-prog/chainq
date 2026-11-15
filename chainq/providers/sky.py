@@ -1,5 +1,4 @@
-from web3 import Web3
-
+from chainq.evm_address import selector
 from chainq.networks import NETWORKS
 from chainq.rpc import ChainClient, connect
 
@@ -10,8 +9,7 @@ RAY = 10**27
 
 
 def _read_uint(client: ChainClient, address: str, signature: str) -> int:
-    selector = Web3.keccak(text=signature)[:4]
-    return int.from_bytes(client.w3.eth.call({"to": address, "data": selector}), "big")
+    return int.from_bytes(client.w3.eth.call({"to": address, "data": selector(signature)}), "big")
 
 
 def _apy_pct(per_second_ray: int) -> float:

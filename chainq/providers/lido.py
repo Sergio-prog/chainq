@@ -1,9 +1,5 @@
-import httpx
-from web3 import Web3
-
 from chainq import cache, http
-from chainq.config import settings
-from chainq.errors import ChainqError
+from chainq.evm_address import checksum, selector
 from chainq.networks import NETWORKS
 from chainq.rpc import ChainClient, connect
 
@@ -13,31 +9,21 @@ WSTETH_ADDRESS = "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
 
 
 def _read_uint(client: ChainClient, address: str, signature: str) -> int:
-    selector = Web3.keccak(text=signature)[:4]
-    to = Web3.to_checksum_address(address)
-    return int.from_bytes(client.w3.eth.call({"to": to, "data": selector}), "big")
+    return int.from_bytes(client.w3.eth.call({"to": checksum(address), "data": selector(signature)}), "big")
 
 
-def apr() -> dict:
-    key = cache.key_for("lido-apr")
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-    try:
-        resp = http.get(SMA_APR_URL, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"Lido API request failed: {exc}") from exc
-    if resp.status_code >= 400:
-        raise ChainqError(f"Lido API returned HTTP {resp.status_code}")
-    data = resp.json().get("data") or {}
+def _fetch_apr() -> dict:
+    data = http.fetch_json("Lido API", SMA_APR_URL).get("data") or {}
     points = data.get("aprs") or []
-    result = {
+    return {
         "steth_apr_pct": data.get("smaApr"),
         "steth_apr_latest_pct": points[-1].get("apr") if points else None,
         "sma_window_days": len(points),
     }
-    cache.put(key, result, ttl=300)
-    return result
+
+
+def apr() -> dict:
+    return cache.remember(("lido-apr",), 300, _fetch_apr)
 
 
 def onchain() -> dict:

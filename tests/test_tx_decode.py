@@ -102,5 +102,5 @@ class _FakeResponse:
 def test_fourbyte_signature_malformed_results_returns_none(monkeypatch):
     monkeypatch.setattr(fourbyte.cache, "get", lambda key: None)
     monkeypatch.setattr(fourbyte.cache, "put", lambda key, value, ttl: None)
-    monkeypatch.setattr(fourbyte.http, "get", lambda *args, **kwargs: _FakeResponse({"results": [{"id": 1}]}))
+    monkeypatch.setattr(fourbyte.http, "request", lambda *args, **kwargs: _FakeResponse({"results": [{"id": 1}]}))
     assert fourbyte.signature("0xaaaaaaaa") is None

@@ -1,8 +1,4 @@
-import httpx
-
 from chainq import cache, http
-from chainq.config import settings
-from chainq.errors import ChainqError
 
 GRAPHQL_URL = "https://api.morpho.org/graphql"
 
@@ -42,23 +38,12 @@ VAULTS_QUERY = """
 """
 
 
-def _query(query: str, cache_tag: str, chain_id: int) -> list[dict]:
-    key = cache.key_for("morpho", cache_tag, chain_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-    try:
-        resp = http.post(GRAPHQL_URL, json={"query": query % chain_id}, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"Morpho API request failed: {exc}") from exc
-    if resp.status_code >= 400:
-        raise ChainqError(f"Morpho API returned HTTP {resp.status_code}")
-    payload = resp.json()
-    if payload.get("errors"):
-        raise ChainqError(f"Morpho API error: {payload['errors'][0].get('message', payload['errors'])}")
-    result = payload["data"][cache_tag]["items"]
-    cache.put(key, result, ttl=60)
-    return result
+def _query(query: str, field: str, chain_id: int) -> list[dict]:
+    def fetch() -> list[dict]:
+        data = http.fetch_graphql("Morpho API", GRAPHQL_URL, query % chain_id)
+        return ((data.get(field) or {}).get("items")) or []
+
+    return cache.remember(("morpho", field, chain_id), 60, fetch)
 
 
 def markets(chain_id: int) -> list[dict]:

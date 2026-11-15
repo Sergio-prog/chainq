@@ -2,7 +2,6 @@ from dataclasses import dataclass, replace
 from functools import cache as memoize
 
 from chainq import __version__, cache, http
-from chainq.config import settings
 from chainq.errors import ChainqError
 from chainq.evm_address import checksum, is_hex_address
 from chainq.networks import NETWORKS
@@ -50,14 +49,8 @@ PENDLE_PRICES: dict[tuple[str, str], float] = {}
 
 def _fetch_json(url: str) -> object | None:
     try:
-        resp = http.get(url, headers={"User-Agent": f"chainq/{__version__}"}, timeout=settings.http_timeout)
-    except Exception:
-        return None
-    if resp.status_code != 200:
-        return None
-    try:
-        return resp.json()
-    except Exception:
+        return http.fetch_json("token list", url, headers={"User-Agent": f"chainq/{__version__}"})
+    except ChainqError:
         return None
 
 

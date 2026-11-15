@@ -3,6 +3,7 @@ import time
 import httpx
 
 from chainq.config import settings
+from chainq.errors import ChainqError
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 MAX_RETRY_AFTER_SECONDS = 3.0
@@ -35,3 +36,38 @@ def get(url: str, **kwargs) -> httpx.Response:
 
 def post(url: str, **kwargs) -> httpx.Response:
     return request("POST", url, **kwargs)
+
+
+class UpstreamError(ChainqError):
+    def __init__(self, message: str, status: int | None = None, response: httpx.Response | None = None):
+        super().__init__(message)
+        self.status = status
+        self.response = response
+
+
+def fetch_json(source: str, url: str, *, method: str = "GET", missing_ok: bool = False, **kwargs) -> object:
+    try:
+        resp = request(method, url, **kwargs)
+    except httpx.HTTPError as exc:
+        raise UpstreamError(f"{source} request failed: {exc}") from exc
+    if resp.status_code == 404 and missing_ok:
+        return None
+    if resp.status_code == 429:
+        raise UpstreamError(f"{source} rate limit hit; retry shortly", 429, resp)
+    if resp.status_code >= 400:
+        raise UpstreamError(f"{source} returned HTTP {resp.status_code}", resp.status_code, resp)
+    try:
+        return resp.json()
+    except ValueError as exc:
+        raise UpstreamError(f"{source} returned invalid JSON", resp.status_code, resp) from exc
+
+
+def fetch_graphql(source: str, url: str, query: str) -> dict:
+    payload = fetch_json(source, url, method="POST", json={"query": query})
+    errors = payload.get("errors") if isinstance(payload, dict) else None
+    if errors:
+        raise UpstreamError(f"{source} error: {errors[0].get('message', errors)}")
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        raise UpstreamError(f"{source} returned an unexpected payload (no data)")
+    return data
