@@ -26,8 +26,8 @@ def _fetch(path: str, params: dict | None, slug: str | None) -> dict:
             raise
         message = _error_message(exc.response)
         if "api key" in message.lower():
-            slug_hint = f" (or '{slug}' is not a valid collection slug — check the opensea.io URL)" if slug else ""
-            raise ChainqError(f"OpenSea: {message} — {KEY_HINT}{slug_hint}") from exc
+            slug_hint = f" (or '{slug}' is not a valid collection slug; check the opensea.io URL)" if slug else ""
+            raise ChainqError(f"OpenSea: {message}; {KEY_HINT}{slug_hint}") from exc
         if exc.status == 404:
             raise ChainqError(f"OpenSea: not found ({message}); collection slugs come from opensea.io URLs") from exc
         if exc.status == 429:

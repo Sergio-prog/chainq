@@ -80,7 +80,7 @@ def maybe_remind() -> None:
         and parse_version(latest) > parse_version(__version__)
         and now - state.get("reminded_at", 0) > CHECK_INTERVAL_SECONDS
     ):
-        print(f"chainq {latest} is available (you have {__version__}) — run `chainq update`", file=sys.stderr)
+        print(f"chainq {latest} is available (you have {__version__}); run `chainq update`", file=sys.stderr)
         state["reminded_at"] = now
         _write_state(state)
     if now - state.get("checked_at", 0) > CHECK_INTERVAL_SECONDS:

@@ -1,10 +1,10 @@
-# ⛓️ chainq
+# chainq
 
-**One CLI for the crypto world — built for AI agents, pleasant for humans.**
+**One CLI for crypto and onchain data, built for AI agents and readable by people.**
 
 [chainq.serhiifotex.dev](https://chainq.serhiifotex.dev/)
 
-Query and transform Web3 data from one predictable CLI: asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols, perps, and EVM utilities. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
+chainq covers asset prices, wallet balances and portfolios (EVM and Solana), gas, transactions, raw RPC, address inspection, DeFi protocols, perps, and EVM utilities. Curated public RPC endpoints with automatic fallback are built in, so there is nothing to set up. Only `nft top` and long-tail NFT slugs need an API key.
 
 ```console
 $ chainq price eth btc hype
@@ -26,19 +26,19 @@ Base    cbBTC           0.0149          0.7126  144,452,332.80           4.2015
 
 ## Why
 
-Agents are terrible at juggling five different APIs, auth schemes, and SDKs — and great at running one predictable CLI. chainq gives every command three output modes:
+An agent handles one CLI with one output contract more reliably than five APIs with their own auth and SDKs. Every query command has these output modes:
 
 | Mode | Flag | Output |
 |---|---|---|
 | human | *(default)* | one readable line per result |
 | machine | `--json` | structured JSON for parsing |
 | table | `--format table` | aligned columns for humans scanning lists |
-| toon | `--format toon` | compact tabular text — fewer tokens than JSON for LLM contexts |
+| toon | `--format toon` | compact tabular text, 2-3x fewer tokens than JSON |
 | pipe | `-q` | bare primary value only |
 
-Plus `-v` for provenance (RPC endpoint used, data source, explorer links). Errors go to stderr with exit code 1. Responses are cached briefly (30–60s) so repeated queries stay fast and under rate limits.
+`-v` adds provenance: the RPC endpoint used, data sources, and explorer links. Errors go to stderr with exit code 1, and usage errors exit 2. Responses are cached for 30 to 300 seconds, so repeated queries are fast and stay under rate limits. Partial failures are reported in the output (`unreachable`, `price_failures`) instead of being dropped.
 
-In interactive terminals the text output is colorized — dim labels, bold values, green/red price changes. Piped output stays plain automatically; disable colors explicitly with `chainq --no-color <command>` or the `NO_COLOR` env var. `chainq --version` prints the version.
+In a terminal, text output dims labels, bolds values, and colors price changes green or red. Piped output is plain, and so is `--help`. Turn colors off with `chainq --no-color <command>` or `NO_COLOR`. `chainq --version` prints the version.
 
 ## Install
 
@@ -74,7 +74,7 @@ git clone https://github.com/Sergio-prog/chainq && cd chainq
 uv tool install .
 ```
 
-The install scripts bootstrap uv if it's missing (whether or not Python is already installed — uv provisions Python 3.12+ as needed). Update any time with `chainq update`; package-manager output stays hidden unless you pass `-v`, and Homebrew updates run without a confirmation prompt. chainq also checks for new versions once a day and prints a reminder, homebrew/pnpm style. Shell tab-completion: `chainq --install-completion`.
+The install scripts install uv if it is missing, and uv provisions Python 3.12+ when needed. `chainq update` upgrades in place; it hides package-manager output unless you pass `-v`, and Homebrew upgrades skip the confirmation prompt. chainq checks for a new version once a day and prints a one-line reminder. Shell completion: `chainq --install-completion`.
 
 ## Commands
 
@@ -95,7 +95,7 @@ chainq asset btc --links tradingview,binance,coingecko  # add chart/exchange lin
 chainq search "sky protocol"     # resolve fuzzy names to asset ids
 ```
 
-The default yields text output aligns APY, type, market, network, and TVL into readable terminal columns. Interactive terminals color APY green, dim metadata, and emphasize TVL; piped output stays plain. Use `--format table` for field headers or `--json` for structured data.
+`yields` text output aligns APY, type, market, network, and TVL in columns. Use `--format table` for field headers or `--json` for structured data.
 
 `chainq asset` appends an asset link line (TradingView by default). Choose providers with `--links tradingview,binance,coingecko`, or set a persistent default with `chainq config set asset-links binance,coingecko` (or the `CHAINQ_ASSET_LINKS` env var).
 
@@ -111,7 +111,15 @@ chainq etf btc -d 7              # daily US spot Bitcoin ETF net flows, per issu
 chainq etf eth --json           # Ethereum ETF flows as structured JSON
 ```
 
-`buybacks` takes one or more programs — **hype, sky, uni, zro** (plus `lit`, see below) — and never guesses a default set, so you only pay for the sources you ask for. Each program is reported at its actual cadence and carries its `source`, `source_url`, and `provenance` (`live` or `snapshot`) on every row; the text view aligns period/amount/cost/avg into a table with a totals row, and drops columns a program doesn't report. HYPE is live (Hyperliquid Assistance Fund spot fills, daily); SKY is live onchain (Smart Burn Engine `Exec` events — `MCD_FLAP` resolved from the Sky chainlog — ~every 4h, bucketed per day); UNI is live onchain (Firepit `Released` burn events, per day); ZRO is parsed live from the LayerZero foundation tracker (monthly) and falls back to a clearly-labeled retained snapshot if the page is unreachable. LIT is intentionally not synthesized: the Lighter treasury buys LIT via daily TWAP, but that account's fills are auth-gated, so `chainq buybacks lit` reports the exact data limitation instead of inventing numbers. `etf` pulls daily net flows from The Block's public data API (no key required) with source attribution.
+`buybacks` takes one or more programs (`hype`, `sky`, `uni`, `zro`, `lit`) and has no default set, so it only queries the sources you name. Each program is reported at its own cadence, and every row carries `source`, `source_url`, and `provenance` (`live` or `snapshot`). The text view prints period, amount, cost, and average price with a totals row.
+
+- HYPE: Hyperliquid Assistance Fund spot fills, live, daily.
+- SKY: Smart Burn Engine `Exec` events read onchain (`MCD_FLAP` comes from the Sky chainlog), about every 4h, bucketed per day.
+- UNI: Firepit `Released` burn events read onchain, per day.
+- ZRO: parsed from the LayerZero foundation tracker, monthly, with a labeled snapshot if the page is down.
+- LIT: the Lighter treasury buys through a daily TWAP whose fills require auth, so `chainq buybacks lit` reports that limitation instead of numbers.
+
+`etf` reads daily net flows from The Block's public data API; no key is required.
 
 ### Onchain (EVM + Solana)
 
@@ -142,7 +150,7 @@ chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatc
 
 ### EVM queries and utilities
 
-`chainq evm` exposes common EVM primitives for agent workflows. Run `chainq evm --help` for the complete command catalog instead of loading it into agent context up front.
+`chainq evm` holds EVM chain-state reads, contract calls, ABI codecs, hashing, and unit conversions. `chainq schema evm` lists all of them.
 
 ```bash
 chainq evm block-number -n base                       # latest block
@@ -157,9 +165,9 @@ chainq evm keccak 'hello'                              # Keccak-256 of UTF-8 tex
 chainq evm to-wei 1.5 ether                            # 1500000000000000000
 ```
 
-Every subcommand supports `--json`, `-q`, `-v`, and `--format`. Existing `chainq balance`, `chainq gas`, `chainq tx`, and `chainq rpc` remain the canonical cross-chain commands.
+Every subcommand takes `--json`, `-q`, `-v`, and `--format`. For cross-chain work, `chainq balance`, `gas`, `tx`, and `rpc` are the main commands.
 
-27 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, ...), or chain id. Multiple verified public RPCs per network are tried in order, and every request fails over to the next endpoint on HTTP, rate-limit, or unsupported-method errors; override with `CHAINQ_RPC_<NETWORK>` (tried first). Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
+27 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc) plus solana, by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, ...), or chain id. Each network has several verified public RPCs. A request moves to the next endpoint on an HTTP, rate-limit, or unsupported-method error. `CHAINQ_RPC_<NETWORK>` adds your own endpoint, tried first. Token reads batch through Multicall3, so a portfolio sweep costs about one RPC call per network.
 
 ### Protocols
 
@@ -281,7 +289,7 @@ No skill installed? `chainq schema` lists every command with its arguments and o
 
 ## Roadmap
 
-ERC-4626 vault inspector, DeFi positions in portfolio, CEX prices, and more — see [ROADMAP.md](ROADMAP.md).
+Next up: an ERC-4626 vault inspector, lending positions in `portfolio`, and CEX prices. See [ROADMAP.md](ROADMAP.md).
 
 ## Development
 

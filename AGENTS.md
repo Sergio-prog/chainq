@@ -1,16 +1,16 @@
 # AGENTS.md
 
-chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, uv, Typer, httpx, web3.py. Vision and priorities live in [ROADMAP.md](ROADMAP.md) — keep it in sync when shipping features.
+chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, uv, Typer, httpx, web3.py. Vision and priorities live in [ROADMAP.md](ROADMAP.md); keep it in sync when shipping features.
 
 ## Rules
 
 - No code comments; code must be self-explanatory.
 - Conventional commits, branches, and PR titles. Never commit, push, or open a PR without the owner's explicit ask.
 - Before any commit: `uv run ruff check .` and `uv run pytest -q` must pass.
-- Live-test every new or changed command against real endpoints (`uv run chainq ...`) — unit tests deliberately don't mock providers.
+- Live-test every new or changed command against real endpoints (`uv run chainq ...`). Unit tests don't mock providers.
 - Version is defined only in `pyproject.toml` (read at runtime via importlib.metadata). Bump semver on user-visible changes.
 - `.env` holds real keys and is gitignored; never commit it, never print its values.
-- Data sources, in order of preference: the protocol's official API (Aave GraphQL, Pendle, Hyperliquid/Lighter info APIs) → onchain helper/periphery contracts (most protocols deploy them — e.g. Uniswap v3 factory/pool, Aave UiPoolDataProvider) → third-party indexers (DexScreener, DefiLlama) only for discovery/ranking that the first two can't do. Verify new RPC endpoints and API shapes live before shipping (`eth_chainId`, sample responses) — do not trust remembered addresses or schemas.
+- Data sources, in order of preference: the protocol's official API (Aave GraphQL, Pendle, Hyperliquid/Lighter info APIs) → onchain helper/periphery contracts (most protocols deploy them, e.g. Uniswap v3 factory/pool, Aave UiPoolDataProvider) → third-party indexers (DexScreener, DefiLlama) only for discovery/ranking that the first two can't do. Verify new RPC endpoints and API shapes live before shipping (`eth_chainId`, sample responses). Remembered addresses and schemas go stale.
 
 ## Output contract (do not break)
 
@@ -18,7 +18,7 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 - Make default human-facing text visually structured and colorized: align repeated columns, dim labels and metadata, emphasize primary values, and use semantic green/red where meaningful. Preserve plain output for pipes and honor `--no-color`, `NO_COLOR`, and `TERM=dumb`.
 - Errors go to stderr with exit code 1; stdout stays clean for parsing.
 - `chainq schema` is generated from Typer params, so option help strings and types are the machine-readable contract; keep them precise.
-- A new command ships with: the contract flags above, an entry in `skills/chainq/SKILL.md`, and a README example.
+- A new command ships with: the contract flags above, an entry in `skills/chainq/SKILL.md` (table row) and the matching `references/*.md` file, and a README example.
 
 ## Architecture
 
@@ -26,12 +26,12 @@ chainq is an agent-first CLI for onchain and crypto market data. Python 3.12+, u
 - `chainq/config.py` reads env vars plus `~/.config/chainq/.env` and `./.env` (exported into the process env, real env wins). `chainq/evm_address.py` is the web3-free checksum/ENS entry point.
 - `chainq/providers/*` are HTTP clients: fetch with `http.fetch_json` / `http.fetch_graphql` (they raise `UpstreamError` naming the source), memoize with `cache.remember` (TTL 30–300s, `~/.cache/chainq/`), and return normalized snake_case rows that commands and `yields` share.
 - `chainq/wallets.py` resolves scan targets and sweeps wallets across networks and DeFi venues for `portfolio` and `address`; `chainq/commands/portfolio.py` only gathers inputs and renders views.
-- `chainq/networks.py` and `chainq/tokens.py` are curated registries (checksummed addresses — tests enforce; SPL mints live in `SOLANA_TOKENS`); `chainq/catalog.py` layers the daily-cached token catalog (CoinGecko per-network lists, Aave, Pendle, Jupiter) on top for symbol resolution and sweeps, and `chainq/pricing.py` is the shared price cascade (CoinGecko → DefiLlama/Jupiter → Pendle → DexScreener with a liquidity floor); `chainq/rpc.py` wraps web3 with RPC fallback and Multicall3 batching (prefer `multicall`/`sweep_catalog` over per-token calls); `chainq/solana.py` is the Solana JSON-RPC client (base58, balances, token accounts); `chainq/output.py` owns all formatting.
-- `chainq/update.py` — self-update + once-daily version reminder (disable via `CHAINQ_NO_UPDATE_CHECK`).
+- `chainq/networks.py` and `chainq/tokens.py` are curated registries (checksummed addresses, enforced by tests; SPL mints live in `SOLANA_TOKENS`); `chainq/catalog.py` layers the daily-cached token catalog (CoinGecko per-network lists, Aave, Pendle, Jupiter) on top for symbol resolution and sweeps, and `chainq/pricing.py` is the shared price cascade (CoinGecko → DefiLlama/Jupiter → Pendle → DexScreener with a liquidity floor); `chainq/rpc.py` wraps web3 with RPC fallback and Multicall3 batching (prefer `multicall`/`sweep_catalog` over per-token calls); `chainq/solana.py` is the Solana JSON-RPC client (base58, balances, token accounts); `chainq/output.py` owns all formatting.
+- `chainq/update.py`: self-update and a once-daily version reminder (disable via `CHAINQ_NO_UPDATE_CHECK`).
 - don't forget that there is landing site in ./site.
 
 ## Important things
 
-- `ROADMAP.md` — vision, shipped versions, what to build next.
-- `skills/chainq/SKILL.md` — the agent skill, primary distribution channel; update on any command change.
-- `install.sh` — public installer (PyPI-first via uv/pipx, git fallback).
+- `ROADMAP.md`: vision, shipped versions, what to build next.
+- `skills/chainq/SKILL.md` and `skills/chainq/references/*.md`: the agent skill, the primary distribution channel. Update them on any command change.
+- `install.sh`: public installer (PyPI-first via uv/pipx, git fallback).
