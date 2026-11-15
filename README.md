@@ -4,7 +4,7 @@
 
 [chainq.serhiifotex.dev](https://chainq.serhiifotex.dev/)
 
-Query and transform Web3 data from one predictable CLI: asset prices, wallet balances and portfolios (EVM + Solana), gas, transactions, raw RPC, address intelligence, DeFi protocols, perps, and EVM utilities. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
+Query and transform Web3 data from one predictable CLI: asset prices, wallet balances and portfolios (EVM + Solana + Tron), gas, transactions, raw RPC, address intelligence, DeFi protocols, perps, and EVM utilities. Zero setup: curated public RPC endpoints with automatic fallback are built in, and no command below needs an API key.
 
 ```console
 $ chainq price eth btc hype
@@ -113,7 +113,7 @@ chainq etf eth --json           # Ethereum ETF flows as structured JSON
 
 `buybacks` takes one or more programs — **hype, sky, uni, zro** (plus `lit`, see below) — and never guesses a default set, so you only pay for the sources you ask for. Each program is reported at its actual cadence and carries its `source`, `source_url`, and `provenance` (`live` or `snapshot`) on every row; the text view aligns period/amount/cost/avg into a table with a totals row, and drops columns a program doesn't report. HYPE is live (Hyperliquid Assistance Fund spot fills, daily); SKY is live onchain (Smart Burn Engine `Exec` events — `MCD_FLAP` resolved from the Sky chainlog — ~every 4h, bucketed per day); UNI is live onchain (Firepit `Released` burn events, per day); ZRO is parsed live from the LayerZero foundation tracker (monthly) and falls back to a clearly-labeled retained snapshot if the page is unreachable. LIT is intentionally not synthesized: the Lighter treasury buys LIT via daily TWAP, but that account's fills are auth-gated, so `chainq buybacks lit` reports the exact data limitation instead of inventing numbers. `etf` pulls daily net flows from The Block's public data API (no key required) with source attribution.
 
-### Onchain (EVM + Solana)
+### Onchain (EVM + Solana + Tron)
 
 ```bash
 chainq networks                                       # supported networks and aliases
@@ -133,11 +133,16 @@ chainq portfolio --paste                              # addresses straight from 
 chainq portfolio --paste --no-cache                   # scans are cached 5 min per wallet+network; force a rescan
 chainq tokens search cat -n base                      # find tokens by symbol/name; status/refresh manage the daily cache
 chainq address 0x... -n base                          # EOA vs contract, proxies, EIP-7702, holdings
-chainq address TokenkegQ...                           # Solana: wallet vs program, token accounts
+chainq address JUP6Lk...                              # Solana: program (upgrade authority), mint, token account, priced holdings
 chainq gas -n base                                    # gas price, base fee, transfer cost in USD
 chainq tx 0xHASH -n ethereum                          # status, parties, value, fee, block, decoded ERC-20 transfers + called function
-chainq tx 5Ufd... -n solana                           # Solana signature lookup
+chainq tx 5Ufd... -n solana                           # Solana: decoded SOL/SPL transfers, signer token deltas, priority fee
 chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatch (getSlot on solana)
+chainq balance TJCo98... --coin usdt                  # Tron: TRX or TRC-20, T…/41… addresses auto-routed
+chainq portfolio TJCo98...                            # TRX + staked TRX + TRC-20s + USDT in the wallet's GasFree account
+chainq tx b2bd6e63...                                 # Tron txid: TRX/TRC-20/GasFree transfer decode, energy + bandwidth fees
+chainq gas -n tron                                    # energy/bandwidth price, USDT transfer cost, GasFree fee
+chainq rpc getnowblock -n tron                        # Tron HTTP API (wallet/*); eth_* goes to Tron JSON-RPC
 ```
 
 ### EVM queries and utilities
@@ -159,7 +164,7 @@ chainq evm to-wei 1.5 ether                            # 1500000000000000000
 
 Every subcommand supports `--json`, `-q`, `-v`, and `--format`. Existing `chainq balance`, `chainq gas`, `chainq tx`, and `chainq rpc` remain the canonical cross-chain commands.
 
-27 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc** — plus **solana** — by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, ...), or chain id. Multiple verified public RPCs per network are tried in order, and every request fails over to the next endpoint on HTTP, rate-limit, or unsupported-method errors; override with `CHAINQ_RPC_<NETWORK>` (tried first). Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
+27 EVM networks: **ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc** — plus **solana** and **tron** — by key, alias (`eth`, `arb`, `op`, `rh`, `sol`, `trx`, ...), or chain id. Multiple verified public RPCs per network are tried in order, and every request fails over to the next endpoint on HTTP, rate-limit, or unsupported-method errors; override with `CHAINQ_RPC_<NETWORK>` (tried first). Onchain token reads batch through Multicall3, so portfolio sweeps cost one RPC call per network.
 
 ### Protocols
 
@@ -267,6 +272,7 @@ Values live in `~/.config/chainq/.env`; plain env vars and a `.env` in cwd work 
 | `CHAINQ_HTTP_TIMEOUT` / `CHAINQ_RPC_TIMEOUT` | timeouts in seconds |
 | `CHAINQ_NO_UPDATE_CHECK` | disable the daily update check |
 | `OPENSEA_API_KEY` | unlocks `nft top` and long-tail collection slugs |
+| `TRONGRID_API_KEY` | TronGrid key for Tron calls; keyless works (publicnode first, TronGrid at 3 rps) |
 | `CHAINQ_ASSET_LINKS` | default `asset` link providers (e.g. `tradingview,binance,coingecko`) |
 
 ## For AI agents

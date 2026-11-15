@@ -1,6 +1,6 @@
 ---
 name: chainq
-description: Query live crypto and onchain data via the chainq CLI - prices (spot, historical, OHLC candles), wallet balances and portfolios on 27 EVM networks + Solana, gas, transactions, raw RPC, address inspection (EOA/contract/proxy/program), lending and yield rates (Aave, Morpho, Kamino, Pendle, Sky, Ethena, Lido), DEX pools and stats (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps/funding/prediction markets, NFT floors (OpenSea), stablecoin mcaps and pegs, and DefiLlama TVL/fees for any protocol. Use for any question about crypto prices or history, token/wallet balances, gas costs, a transaction hash, onchain state, what an address is, lending/borrowing rates, vault or staking yields, DEX pools, TVL, funding rates, prediction markets, NFT floors, or stablecoins.
+description: Query live crypto and onchain data via the chainq CLI - prices (spot, historical, OHLC candles), wallet balances and portfolios on 27 EVM networks + Solana + Tron, gas, transactions, raw RPC, address inspection (EOA/contract/proxy/program), lending and yield rates (Aave, Morpho, Kamino, Pendle, Sky, Ethena, Lido), DEX pools and stats (Uniswap, Curve, Aerodrome), Hyperliquid and Lighter perps/funding/prediction markets, NFT floors (OpenSea), stablecoin mcaps and pegs, and DefiLlama TVL/fees for any protocol. Use for any question about crypto prices or history, token/wallet balances, gas costs, a transaction hash, onchain state, what an address is, lending/borrowing rates, vault or staking yields, DEX pools, TVL, funding rates, prediction markets, NFT floors, or stablecoins.
 ---
 
 # chainq
@@ -89,9 +89,9 @@ chainq etf eth --json              # ETH ETF flows as structured JSON
 
 `buybacks` requires at least one program — **hype, sky, uni, zro** (plus `lit`) — there is no default set, so ask for exactly what you need. It mixes live and snapshot sources: read the `provenance` field on every row. HYPE is live (Hyperliquid Assistance Fund spot fills, daily); SKY is live onchain (Smart Burn Engine `Exec` events, ~every 4h, bucketed per day); UNI is live onchain (Firepit `Released` burn events, per day); the two onchain programs read Ethereum logs and take a few seconds. ZRO is parsed live from the LayerZero tracker (monthly) with a clearly-labeled snapshot fallback if the page is unreachable. LIT returns a precise data limitation rather than fabricated numbers: the Lighter treasury's TWAP fills are auth-gated. Each row includes `source`, `source_url`, `cadence`, and `provenance`; use `--json`/`--format table` to consume them. `etf` returns daily net flows (US$) with a `net_flow_usd` total plus per-issuer columns; sourced from The Block, no API key needed. Use `-q` for the latest day's net flow only.
 
-## Onchain (EVM + Solana)
+## Onchain (EVM + Solana + Tron)
 
-27 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc) plus solana. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype, rh, sol...), or chain ids. Default is ethereum. `chainq networks` lists all.
+27 EVM networks (ethereum, arbitrum, base, optimism, polygon, bsc, avalanche, gnosis, unichain, linea, scroll, zksync, mantle, blast, sonic, berachain, worldchain, ink, soneium, celo, sei, hyperevm, monad, plasma, katana, robinhood, arc) plus solana and tron. `--network`/`-n` accepts keys, aliases (eth, arb, op, matic, bnb, avax, hype, rh, sol, trx...), or chain ids. Default is ethereum. `chainq networks` lists all.
 
 ```bash
 chainq balance vitalik.eth                                    # native balance, ENS ok
@@ -140,15 +140,30 @@ chainq balance 9WzDX... -n solana                             # SOL balance
 chainq balance 9WzDX... -n sol --coin usdc                    # SPL token by symbol (curated, then Jupiter verified / CoinGecko) or mint
 chainq portfolio 9WzDX...                                     # SOL + every catalog mint with a Jupiter price; unknown/unpriced mints hidden
 chainq portfolio 9WzDX... --all                               # show unknown mints too (as short addresses, unpriced)
-chainq address 9WzDX...                                       # wallet vs program, owner program, token account count
-chainq tx 5UfDuX94A1Qfq... -n solana                          # by signature: status, signer, fee, slot
-chainq gas -n solana                                          # base fee + median priority fee, transfer cost USD
+chainq address 9WzDX...                                       # wallet/program/mint/token account; priced holdings, upgrade or mint authority
+chainq tx 5UfDuX94A1Qfq... -n solana                          # status, fee + priority fee, decoded SOL/SPL transfers, signer token deltas
+chainq gas -n solana                                          # base fee + priority fee p50/p75/p90, transfer cost USD
 chainq rpc getSlot -n solana                                  # raw Solana JSON-RPC
 ```
 
+### Tron
+
+`T…` base58check and `41…` hex addresses and bare 64-hex txids route to Tron automatically; `-n tron` (alias `trx`) also accepts a 0x address (same key, converted). Data comes from the Tron full-node HTTP API (publicnode/TronGrid); set `TRONGRID_API_KEY` for TronGrid's higher rate limits.
+
+```bash
+chainq balance TJCo98... --coin usdt                          # TRX or TRC-20 (curated: usdt usdc usdd usd1 wtrx strx jst sun btt …)
+chainq portfolio TJCo98...                                    # TRX, staked TRX, priced TRC-20s, USDT parked in the wallet's GasFree account
+chainq address TJCo98...                                      # account/contract/unactivated, proxy impl, TRC-20 profile, energy/bandwidth, GasFree address
+chainq tx b2bd6e63...                                         # TRX/TRC-20/GasFree transfer decode, energy+bandwidth fee, block
+chainq gas -n tron                                            # energy/bandwidth price, TRX + USDT transfer cost, GasFree fee
+chainq rpc getnowblock -n tron                                # wallet/* HTTP API; eth_* methods go to Tron JSON-RPC
+```
+
+GasFree (gas-free USDT, gasfree.io) is read onchain from its controller `TFFAMQLZybALaLb4uxHA9RBE7pxhUAjF3U`: `tx --json` exposes `gasfree.{user,receiver,amount,fee,activate_fee,provider}`; `kind` is `trx_transfer`, `trc20_transfer`, `gasfree_transfer`, or `contract_call`.
+
 ## Address intelligence
 
-`chainq address <addr>` answers "what is this address?" on any network: EOA vs contract (with EIP-7702 delegation detection), proxy resolution (EIP-1967/1167/ZeppelinOS → implementation address), ERC-20 token profile (name, symbol, decimals, supply), tx count, native + catalog token holdings with USD values (unpriced holdings counted in `holdings_hidden`), reverse ENS on ethereum, explorer link. On Solana: wallet vs program, owner program, SOL balance, token accounts. Use it before interacting with an unknown address, or to check whether a token contract is a proxy.
+`chainq address <addr>` answers "what is this address?" on any network: EOA vs contract (with EIP-7702 delegation detection), proxy resolution (EIP-1967/1167/ZeppelinOS → implementation address), ERC-20 token profile (name, symbol, decimals, supply), tx count, native + catalog token holdings with USD values (unpriced holdings counted in `holdings_hidden`), reverse ENS on ethereum, explorer link. On Solana: wallet/program (upgrade authority)/SPL mint (supply, authorities)/token account, priced holdings. On Tron: account/contract/unactivated, proxy, TRC-20 profile, resources, GasFree account. Use it before interacting with an unknown address, or to check whether a token contract is a proxy.
 
 ## Aave v3 (lending)
 
@@ -278,10 +293,10 @@ Funding is shown as hourly rate and annualized APR; negative funding means short
 
 ## Recipes
 
-- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + every catalog token, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS and Solana base58/.sol addresses. Pass several addresses (or `-F file`) to scan many wallets in parallel; `--by network|total|token` picks the view; `--sort balance|input|address` orders wallets (default balance, largest first) and `--short` abbreviates addresses. Scan results are cached 5 min per wallet+network (`--no-cache` rescans); a progress spinner goes to stderr only on a TTY. Use `balance` for a single token/network.
+- "What's in this wallet?" / "net worth of this address" — `portfolio <address>` sweeps every network in one call (native + every catalog token, sorted by USD value, `total_usd` in `--json`); works for 0x/ENS, Solana base58/.sol, and Tron T… addresses. Pass several addresses (or `-F file`) to scan many wallets in parallel; `--by network|total|token` picks the view; `--sort balance|input|address` orders wallets (default balance, largest first) and `--short` abbreviates addresses. Scan results are cached 5 min per wallet+network (`--no-cache` rescans); a progress spinner goes to stderr only on a TTY. Use `balance` for a single token/network.
 - "Unknown token 'X'" / "which address is X?" — `tokens search X -n <network>`; if several tokens share the symbol, pick the address and pass it to `balance --coin`.
 - "What is this address?" / "is this contract safe to read?" — `address <addr> -n <network>`: EOA vs contract, proxy implementation, token profile, holdings.
 - "Is it a good time to transact?" — `gas -n <network>`; the transfer-cost USD figure is the answer for simple sends.
-- "Did my tx go through?" — `tx 0xHASH -n <network>` (or the base58 signature with `-n solana`); check `status` and quote the explorer link from `-v`.
+- "Did my tx go through?" — `tx 0xHASH -n <network>` (Solana signatures and Tron txids auto-route); check `status` and quote the explorer link from `-v`.
 - "Best stable swap rate / stable yields on Curve vs elsewhere" — compare `curve pools -c <coin>` APYs with `aave`/`morpho` supply APYs.
-- Anything chainq lacks a command for — `chainq rpc <method> [params...]` (EVM or Solana methods).
+- Anything chainq lacks a command for — `chainq rpc <method> [params...]` (EVM, Solana, or Tron methods).
