@@ -106,9 +106,19 @@ def funding_rates() -> dict[str, float]:
     return {r["symbol"]: float(r["rate"]) for r in rates if r.get("exchange") == "lighter"}
 
 
-def account(l1_address: str) -> dict:
-    payload = _get("/account", {"by": "l1_address", "value": l1_address}, ttl=5)
+def find_account(l1_address: str) -> dict | None:
+    try:
+        payload = _get("/account", {"by": "l1_address", "value": l1_address}, ttl=5)
+    except ChainqError as exc:
+        if "not found" in str(exc):
+            return None
+        raise
     accounts = payload.get("accounts") or []
-    if not accounts:
+    return accounts[0] if accounts else None
+
+
+def account(l1_address: str) -> dict:
+    found = find_account(l1_address)
+    if found is None:
         raise ChainqError(f"no Lighter account found for {l1_address}")
-    return accounts[0]
+    return found

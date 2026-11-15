@@ -45,6 +45,8 @@ def markets(chain_id: int) -> list[dict]:
     payload = resp.json()
     if payload.get("errors"):
         raise ChainqError(f"Aave API error: {payload['errors'][0].get('message', payload['errors'])}")
-    result = payload["data"]["markets"]
+    result = (payload.get("data") or {}).get("markets")
+    if not isinstance(result, list):
+        raise ChainqError("Aave API returned an unexpected payload (no markets)")
     cache.put(key, result, ttl=60)
     return result

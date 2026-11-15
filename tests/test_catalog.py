@@ -192,7 +192,7 @@ def test_pricing_cascade(monkeypatch):
         {"network": "base", "symbol": "aUSDC", "token_address": ATOKEN, "amount": "1"},
         {"network": "solana", "symbol": "????", "token_address": "x", "amount": "1", "kind": "unknown"},
     ]
-    pricing.price_assets(assets)
+    assert pricing.price_assets(assets) == []
     by_symbol = {a["symbol"]: a for a in assets}
     assert (by_symbol["USDC"]["price_source"], by_symbol["USDC"]["value_usd"]) == ("coingecko", 2.0)
     assert (by_symbol["BASECAT"]["price_source"], by_symbol["BASECAT"]["value_usd"]) == ("defillama", 4.0)
@@ -214,6 +214,6 @@ def test_pricing_survives_provider_failures(monkeypatch):
     monkeypatch.setattr(pricing.jupiter, "prices", boom)
     monkeypatch.setattr(pricing.uniswap, "token_pairs_batch", boom)
     assets = [{"network": "base", "symbol": "X", "token_address": BASECAT, "amount": "1", "coingecko_id": "x"}]
-    pricing.price_assets(assets)
+    assert pricing.price_assets(assets) == ["coingecko", "defillama", "dexscreener"]
     assert assets[0]["price_usd"] is None
     assert assets[0]["value_usd"] is None

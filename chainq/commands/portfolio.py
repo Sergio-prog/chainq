@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
@@ -135,27 +136,21 @@ def _scan_network(net_key: str, address: str) -> list[dict]:
 
 def _scan_hyperliquid(address: str) -> list[dict]:
     assets: list[dict] = []
-    try:
-        state = hyperliquid.clearinghouse_state(address)
-        equity = float((state.get("marginSummary") or {}).get("accountValue") or 0)
-        if equity:
-            assets.append(
-                {
-                    "network": "hyperliquid",
-                    "symbol": "perp equity (USDC)",
-                    "token_address": None,
-                    "amount": str(equity),
-                    "price_usd": 1.0,
-                    "price_source": "hyperliquid",
-                    "value_usd": equity,
-                }
-            )
-    except Exception:
-        pass
-    try:
-        balances = hyperliquid.spot_balances(address)
-    except Exception:
-        return assets
+    state = hyperliquid.clearinghouse_state(address)
+    equity = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+    if equity:
+        assets.append(
+            {
+                "network": "hyperliquid",
+                "symbol": "perp equity (USDC)",
+                "token_address": None,
+                "amount": str(equity),
+                "price_usd": 1.0,
+                "price_source": "hyperliquid",
+                "value_usd": equity,
+            }
+        )
+    balances = hyperliquid.spot_balances(address)
     if not balances:
         return assets
     prices = {"USDC": 1.0}
@@ -183,11 +178,10 @@ def _scan_hyperliquid(address: str) -> list[dict]:
 
 
 def _scan_lighter(address: str) -> list[dict]:
-    try:
-        acc = lighter.account(address)
-        balances = lighter.asset_balances(acc)
-    except Exception:
+    acc = lighter.find_account(address)
+    if acc is None:
         return []
+    balances = lighter.asset_balances(acc)
     assets: list[dict] = []
     equity = float(acc.get("total_asset_value") or 0)
     if equity:
@@ -241,7 +235,7 @@ def _resolve_scan_target(address: str, networks: list[str] | None) -> tuple[str,
 
 MAX_SCAN_WORKERS = 16
 SCAN_TTL = 300
-DEFI_SOURCE = "defi"
+DEFI_SCANNERS = {"hyperliquid": _scan_hyperliquid, "lighter": _scan_lighter}
 VIEWS = ("network", "total", "token")
 
 
@@ -307,20 +301,24 @@ def _resolve_targets(inputs: list[str], networks: list[str] | None) -> list[tupl
     return list(targets.values())
 
 
-def _scan_defi(address: str) -> list[dict]:
-    return _scan_hyperliquid(address) + _scan_lighter(address)
-
-
 def _scan_job(addr: str, source: str) -> list[dict]:
-    return _scan_defi(addr) if source == DEFI_SOURCE else _scan_network(source, addr)
+    if source in DEFI_SCANNERS:
+        return DEFI_SCANNERS[source](addr)
+    return _scan_network(source, addr)
 
 
-def _scan_wallets(
-    targets: list[tuple[str, str, list[str]]], defi: bool, use_cache: bool
-) -> tuple[dict[str, list[dict]], dict[str, list[str]], int]:
+@dataclass
+class ScanResult:
+    assets: dict[str, list[dict]]
+    unreachable: dict[str, list[str]]
+    cache_hits: int
+    price_failures: list[str]
+
+
+def _scan_wallets(targets: list[tuple[str, str, list[str]]], defi: bool, use_cache: bool) -> ScanResult:
     jobs = [(addr, key) for _, addr, keys in targets for key in keys]
     if defi:
-        jobs += [(addr, DEFI_SOURCE) for _, addr, _ in targets if addr.startswith("0x")]
+        jobs += [(addr, source) for _, addr, _ in targets if addr.startswith("0x") for source in DEFI_SCANNERS]
     keys = {job: cache.key_for("portfolio", *job) for job in jobs}
     cached = cache.get_many(list(keys.values())) if use_cache else {}
     assets: dict[str, list[dict]] = {addr: [] for _, addr, _ in targets}
@@ -329,6 +327,7 @@ def _scan_wallets(
         assets[addr].extend(cached.get(key, []))
     pending = [job for job in jobs if keys[job] not in cached]
     scanned: dict[tuple[str, str], list[dict]] = {}
+    price_failures: list[str] = []
     if pending:
         wallets = len({addr for addr, _ in pending})
         with Progress(f"scanning {wallets} wallet(s)", len(pending)) as progress:
@@ -342,11 +341,19 @@ def _scan_wallets(
                     except Exception:
                         unreachable[job[0]].append(job[1])
             progress.stage("pricing assets")
-            pricing.price_assets([a for (_, source), found in scanned.items() if source != DEFI_SOURCE for a in found])
-        cache.put_many({keys[job]: found for job, found in scanned.items()}, SCAN_TTL)
+            price_failures = pricing.price_assets(
+                [a for (_, source), found in scanned.items() if source not in DEFI_SCANNERS for a in found]
+            )
+        if not price_failures:
+            cache.put_many({keys[job]: found for job, found in scanned.items()}, SCAN_TTL)
         for (addr, _), found in scanned.items():
             assets[addr].extend(found)
-    return assets, {addr: sorted(keys) for addr, keys in unreachable.items()}, len(jobs) - len(pending)
+    return ScanResult(
+        assets=assets,
+        unreachable={addr: sorted(keys) for addr, keys in unreachable.items()},
+        cache_hits=len(jobs) - len(pending),
+        price_failures=price_failures,
+    )
 
 
 def _filter_assets(assets: list[dict], min_usd: float, show_all: bool, hide_unpriced: bool) -> tuple[list[dict], int]:
@@ -369,7 +376,7 @@ def _hidden_note(hidden: int, show_all: bool, min_usd: float) -> str:
 
 
 def _single_report(
-    out: Out, wallet: dict, keys: list[str], defi: bool, show_all: bool, min_usd: float, cache_hits: int
+    out: Out, wallet: dict, keys: list[str], defi: bool, show_all: bool, min_usd: float, scan: ScanResult
 ) -> None:
     address, addr, assets = wallet["input"], wallet["address"], wallet["assets"]
     unreachable, hidden, total = wallet["unreachable"], wallet["hidden"], wallet["total_usd"]
@@ -381,6 +388,7 @@ def _single_report(
         "networks_scanned": len(keys) - len(unreachable),
         "unreachable": unreachable,
         "hidden_assets": hidden,
+        "price_failures": scan.price_failures,
         "total_usd": total,
         "assets": assets,
     }
@@ -395,6 +403,8 @@ def _single_report(
         lines.append(_hidden_note(hidden, show_all, min_usd))
     if unreachable:
         lines.append(f"  (unreachable: {', '.join(unreachable)})")
+    if scan.price_failures:
+        lines.append(f"  {_price_failure_note(scan.price_failures)}")
     out.emit(
         data,
         lines,
@@ -403,9 +413,13 @@ def _single_report(
             f"scanned {len(keys)} network(s), {sum(len(catalog.tokens_for(k)) for k in keys):,} catalog tokens"
             + (" + Hyperliquid + Lighter" if defi else ""),
             f"address: {addr}",
-            _cache_note(cache_hits),
+            _cache_note(scan.cache_hits),
         ],
     )
+
+
+def _price_failure_note(sources: list[str]) -> str:
+    return f"(price sources failed: {', '.join(sources)}; some values are missing, rerun shortly)"
 
 
 def _cache_note(hits: int) -> str:
@@ -556,10 +570,10 @@ def portfolio(
     if sort not in SORTS:
         raise ChainqError(f"unknown sort '{sort}' (use: {' | '.join(SORTS)})")
     targets = _resolve_targets(_gather_inputs(addresses, file, paste), networks)
-    found, unreachable, cache_hits = _scan_wallets(targets, defi, not no_cache)
+    scan = _scan_wallets(targets, defi, not no_cache)
     wallets = []
     for value, addr, _ in targets:
-        assets, hidden = _filter_assets(found[addr], min_usd, show_all, hide_unpriced)
+        assets, hidden = _filter_assets(scan.assets[addr], min_usd, show_all, hide_unpriced)
         by_network: dict[str, float] = {}
         for a in assets:
             by_network[a["network"]] = by_network.get(a["network"], 0) + (a["value_usd"] or 0)
@@ -569,13 +583,13 @@ def portfolio(
                 "address": addr,
                 "assets": assets,
                 "hidden": hidden,
-                "unreachable": unreachable[addr],
+                "unreachable": scan.unreachable[addr],
                 "networks": {n: usd for n, usd in by_network.items() if usd},
                 "total_usd": sum(by_network.values()),
             }
         )
     if len(wallets) == 1 and by is None:
-        _single_report(out, wallets[0], targets[0][2], defi, show_all, min_usd, cache_hits)
+        _single_report(out, wallets[0], targets[0][2], defi, show_all, min_usd, scan)
         return
     if all(not w["assets"] and w["unreachable"] for w in wallets):
         raise ChainqError("no assets found; every scanned network was unreachable")
@@ -591,12 +605,15 @@ def portfolio(
         "wallets_scanned": len(wallets),
         "hidden_assets": hidden,
         "unreachable": failed,
+        "price_failures": scan.price_failures,
         **data,
     }
     if hidden:
         lines.append(_hidden_note(hidden, show_all, min_usd).strip())
     if failed:
         lines.append("(unreachable: " + ", ".join(f"{k} for {n} wallet(s)" for k, n in sorted(failed.items())) + ")")
+    if scan.price_failures:
+        lines.append(_price_failure_note(scan.price_failures))
     keys = sorted({k for _, _, ks in targets for k in ks})
     out.emit(
         data,
@@ -604,7 +621,7 @@ def portfolio(
         quiet_value=data["total_usd"],
         verbose_lines=[
             f"scanned {len(wallets)} wallet(s) × {len(keys)} network(s)" + (" + Hyperliquid + Lighter" if defi else ""),
-            _cache_note(cache_hits),
+            _cache_note(scan.cache_hits),
             "links: wallet labels open DeBank in terminals with OSC 8 hyperlink support",
         ],
     )
