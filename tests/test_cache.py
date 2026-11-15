@@ -63,3 +63,15 @@ def test_put_many_get_many(tmp_path, monkeypatch):
     cache.put_many({"a": [1], "b": []}, ttl=60)
     cache.put("stale", "old", ttl=-1)
     assert cache.get_many(["a", "b", "stale", "missing"]) == {"a": [1], "b": []}
+
+
+def test_concurrent_puts_keep_every_entry(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(cache, "CACHE_FILE", tmp_path / "cache.json")
+    keys = [cache.key_for("concurrent", i) for i in range(40)]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda k: cache.put(k, k, ttl=60), keys))
+    assert cache.get_many(keys) == {k: k for k in keys}
+    assert not list(tmp_path.glob("*.tmp"))

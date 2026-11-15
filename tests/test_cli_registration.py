@@ -1,6 +1,7 @@
 import subprocess
 import sys
 
+import pytest
 import typer
 from typer.testing import CliRunner
 
@@ -51,3 +52,20 @@ def test_startup_does_not_import_heavy_deps():
     probe = "import sys, chainq.cli; print(sorted(m for m in ('web3', 'pydantic', 'rich.console') if m in sys.modules))"
     result = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True)
     assert result.stdout.strip() == "[]"
+
+
+def test_unexpected_errors_are_one_line(monkeypatch, capsys):
+    from chainq import cli, update
+
+    def boom():
+        raise KeyError("data")
+
+    monkeypatch.setattr(cli, "app", boom)
+    monkeypatch.setattr(update, "maybe_remind", lambda: None)
+    monkeypatch.setattr(cli.sys, "argv", ["chainq", "price", "btc"])
+    monkeypatch.delenv("CHAINQ_DEBUG", raising=False)
+    with pytest.raises(SystemExit) as exit_info:
+        cli.run()
+    assert exit_info.value.code == 1
+    err = capsys.readouterr().err
+    assert err.startswith("error: unexpected KeyError") and err.count("\n") == 1

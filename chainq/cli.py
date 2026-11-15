@@ -127,4 +127,6 @@ def run():
             _fail(f"http request failed: {exc}")
         if _is_web3_error(exc):
             _fail(f"rpc request failed: {exc}")
-        raise
+        if os.environ.get("CHAINQ_DEBUG"):
+            raise
+        _fail(f"unexpected {type(exc).__name__}: {exc} (set CHAINQ_DEBUG=1 for a traceback)")
