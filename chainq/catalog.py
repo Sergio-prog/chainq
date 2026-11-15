@@ -176,7 +176,7 @@ def _merge(kept: CatalogToken, other: CatalogToken) -> CatalogToken:
 def _dedupe(tokens: list[CatalogToken]) -> list[CatalogToken]:
     unique: dict[str, CatalogToken] = {}
     for token in tokens:
-        key = token.address if token.network == "solana" else token.address.lower()
+        key = _address_key(token.network, token.address)
         unique[key] = _merge(unique[key], token) if key in unique else token
     return list(unique.values())
 
@@ -197,13 +197,17 @@ def tokens_for(network_key: str) -> tuple[CatalogToken, ...]:
     )
 
 
+def _address_key(network_key: str, address: str) -> str:
+    return address if network_key == "solana" else address.lower()
+
+
+@memoize
+def _by_address(network_key: str) -> dict[str, CatalogToken]:
+    return {_address_key(network_key, token.address): token for token in tokens_for(network_key)}
+
+
 def lookup(network_key: str, address: str) -> CatalogToken | None:
-    wanted = address if network_key == "solana" else address.lower()
-    for token in tokens_for(network_key):
-        candidate = token.address if network_key == "solana" else token.address.lower()
-        if candidate == wanted:
-            return token
-    return None
+    return _by_address(network_key).get(_address_key(network_key, address))
 
 
 def resolve_symbol(network_key: str, symbol: str) -> list[CatalogToken]:
@@ -256,7 +260,12 @@ def refresh(network_keys: list[str]) -> None:
     for key in network_keys:
         for name in _blob_names(key):
             cache.drop_blob(name)
+    clear_memory_cache()
+
+
+def clear_memory_cache() -> None:
     tokens_for.cache_clear()
+    _by_address.cache_clear()
 
 
 def status(network_keys: list[str]) -> list[dict]:
