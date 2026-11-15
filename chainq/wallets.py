@@ -47,13 +47,9 @@ def _venue_asset(venue: str, symbol: str, amount: float, price: float | None) ->
     )
 
 
-def _native_asset(net, wei: int) -> dict:
-    return _asset(net.key, net.native_symbol, Decimal(wei) / Decimal(10**18), coingecko_id=net.native_coingecko_id)
-
-
 def _scan_evm_registry(client, net, address: str) -> list[dict]:
     wei = client.w3.eth.get_balance(address)
-    assets = [_native_asset(net, wei)] if wei else []
+    assets = [native_asset(net, wei)] if wei else []
     for symbol, token_address in TOKENS.get(net.key, {}).items():
         if token_address == net.native_erc20:
             continue
@@ -76,30 +72,36 @@ def _scan_evm_registry(client, net, address: str) -> list[dict]:
     return assets
 
 
+def native_asset(net, wei: int) -> dict:
+    return _asset(net.key, net.native_symbol, Decimal(wei) / Decimal(10**18), coingecko_id=net.native_coingecko_id)
+
+
+def sweep_evm(client, net, address: str) -> tuple[int, list[dict]]:
+    wei, rows = sweep_catalog(client, address, list(catalog.tokens_for(net.key)))
+    tokens = [
+        _asset(
+            net.key,
+            row["symbol"],
+            Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"]),
+            row["token_address"],
+            kind=row["catalog"].kind,
+            source=row["catalog"].source,
+            coingecko_id=row["catalog"].coingecko_id,
+        )
+        for row in rows
+        if row["token_address"] != net.native_erc20
+    ]
+    return wei, tokens
+
+
 def _scan_evm(net_key: str, address: str) -> list[dict]:
     net = NETWORKS[net_key]
     client = connect(net)
     try:
-        wei, rows = sweep_catalog(client, address, list(catalog.tokens_for(net.key)))
+        wei, tokens = sweep_evm(client, net, address)
     except Exception:
         return _scan_evm_registry(client, net, address)
-    assets = [_native_asset(net, wei)] if wei else []
-    for row in rows:
-        if row["token_address"] == net.native_erc20:
-            continue
-        token = row["catalog"]
-        assets.append(
-            _asset(
-                net.key,
-                row["symbol"],
-                Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"]),
-                row["token_address"],
-                kind=token.kind,
-                source=token.source,
-                coingecko_id=token.coingecko_id,
-            )
-        )
-    return assets
+    return ([native_asset(net, wei)] if wei else []) + tokens
 
 
 def _scan_solana(address: str) -> list[dict]:
