@@ -25,6 +25,7 @@ Full install options and docs for agents: https://chainq.serhiifotex.dev/llms.tx
 - Add `-q` for the bare primary value (piping/arithmetic), `-v` for provenance (RPC endpoint, source, explorer links).
 - `--format table` renders lists as aligned columns (good to show humans); `--format toon` is a compact tabular encoding that uses ~2-3x fewer tokens than JSON — prefer it when pulling large lists (e.g. `hl markets -l 50`) into your own context.
 - Errors: stderr + exit code 1. In `--json`/`--format json` mode the error is instead printed to stdout as `{"error": "..."}` (still exit 1) so you can branch on it without reading stderr. A CoinGecko rate-limit error means wait ~1 minute (or `chainq config set coingecko-api-key <key>`); RPC commands are not affected by it.
+- Discover commands with `chainq schema` (one usage line per command; `chainq schema protocols hl --json` for a subtree with types, defaults, and choices).
 - Persistent settings (API keys, custom RPCs, timeouts): `chainq config set/get/list/unset` — no manual .env editing needed.
 - Self-update with `chainq update`; it is concise and non-interactive by default. Use `chainq update -v` to show package-manager output.
 

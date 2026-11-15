@@ -552,7 +552,7 @@ def portfolio(
         bool, typer.Option("--defi", help="also fold in Hyperliquid and Lighter perp equity and spot balances")
     ] = False,
     sort: Annotated[
-        str, typer.Option("--sort", help="wallet order: balance (default, largest first) | input | address")
+        str, typer.Option("--sort", "-s", help="wallet order: balance (default, largest first) | input | address")
     ] = "balance",
     short: Annotated[bool, typer.Option("--short", help="abbreviate wallet addresses (0x1234…abcd)")] = False,
     no_cache: Annotated[

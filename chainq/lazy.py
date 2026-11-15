@@ -13,7 +13,7 @@ def _load(name: str, target: str):
         group = typer.main.get_group(obj)
         group.name = name
         return group
-    single = typer.Typer()
+    single = typer.Typer(add_completion=False)
     single.command(name=name)(obj)
     return typer.main.get_command(single)
 
