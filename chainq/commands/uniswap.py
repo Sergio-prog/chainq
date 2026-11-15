@@ -283,7 +283,7 @@ def _pool_by_address(client, net, address: str, memo: dict) -> list[dict]:
     if token0_raw is None or token1_raw is None or (slot0 is None and reserves is None):
         raise ChainqError(
             f"{address} is not a readable Uniswap v2/v3 pool on {net.name} "
-            "(v4 pools have no address — pass the two tokens instead)"
+            "(v4 pools have no address; pass the two tokens instead)"
         )
     token0, token1 = decode_address(token0_raw), decode_address(token1_raw)
     _token_infos(client, net, [token0, token1], memo)

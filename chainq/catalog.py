@@ -222,7 +222,7 @@ def resolve_one(network_key: str, symbol: str) -> CatalogToken:
         )
     listed = ", ".join(f"{t.address} ({t.name or t.symbol}, {t.source})" for t in matches[:5])
     more = f" and {len(matches) - 5} more" if len(matches) > 5 else ""
-    raise ChainqError(f"'{symbol}' is ambiguous on {network.name}: {listed}{more} — pass the address instead")
+    raise ChainqError(f"'{symbol}' is ambiguous on {network.name}: {listed}{more}; pass the address instead")
 
 
 def search(query: str, network_key: str | None = None, limit: int = 20) -> list[CatalogToken]:

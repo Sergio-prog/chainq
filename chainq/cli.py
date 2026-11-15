@@ -42,7 +42,10 @@ app = typer.Typer(
     no_args_is_help=True,
     pretty_exceptions_enable=False,
     context_settings={"help_option_names": ["-h", "--help"]},
-    help="Agent-friendly CLI for onchain and crypto market data. Every command supports --json, -q, -v.",
+    help=(
+        "Agent-friendly CLI for onchain and crypto market data. "
+        "Query commands take --json, -q, -v, and -f; `chainq schema` lists every command and option."
+    ),
 )
 
 

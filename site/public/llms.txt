@@ -1,20 +1,18 @@
 # chainq
 
-> Agent-first CLI for retrieving and transforming Web3 data. Query prices, wallets, DeFi including Kamino Solana lending markets, perps, NFTs, and raw RPC across 26 EVM networks + Solana; inspect EVM state, call contracts, encode/decode ABI data, hash signatures, and convert values. Zero setup, no API keys.
+> Agent-first CLI for crypto data: prices, wallets, DeFi (including Kamino lending on Solana), perps, NFTs, and raw RPC across 27 EVM networks and Solana. It also reads EVM state, calls contracts, encodes and decodes ABI data, hashes signatures, and converts units. No setup, no API keys.
 
 Install: `curl -LsSf https://raw.githubusercontent.com/Sergio-prog/chainq/main/install.sh | sh` (or `brew install sergio-prog/tap/chainq`, `uv tool install chainq`, `pipx install chainq`). Requires Python 3.12+ (the script bootstraps uv).
 
-Teach an agent to use it: `npx skills add Sergio-prog/chainq` — or agents can self-discover everything via `chainq -h` and `chainq <command> -h`.
+Teach an agent to use it: `npx skills add Sergio-prog/chainq`. Without the skill, `chainq schema` lists every command with its options (`--json` for types, defaults, and choices; `chainq schema evm` for one group).
 
-EVM queries and utilities: run `chainq evm --help` for the complete self-documenting catalog.
-
-Output contract: every command supports `--json` (structured), `-q` (bare value), `-v` (provenance), and `--format text|json|table|toon` (`toon` is a compact tabular encoding using ~2-3x fewer tokens than JSON). Errors go to stderr with exit code 1; in `--json` mode errors print `{"error": "..."}` to stdout instead.
+Output contract: every command supports `--json` (structured), `-q` (bare value), `-v` (provenance), and `--format text|json|table|toon` (`toon` is a compact tabular encoding using ~2-3x fewer tokens than JSON). Errors go to stderr with exit code 1; in `--json` mode errors print `{"error": "..."}` to stdout instead. Usage errors exit 2.
 
 ## Docs
 
 - [Full command reference](/llms-full.txt): every command with examples and usage guidance for agents
 - [README](https://raw.githubusercontent.com/Sergio-prog/chainq/main/README.md): overview, install, commands, configuration
-- [Agent skill](https://raw.githubusercontent.com/Sergio-prog/chainq/main/skills/chainq/SKILL.md): the Claude Code / agent skill definition
+- [Agent skill](https://raw.githubusercontent.com/Sergio-prog/chainq/main/skills/chainq/SKILL.md): the agent skill; its `references/` files hold per-domain usage notes
 - [ROADMAP](https://raw.githubusercontent.com/Sergio-prog/chainq/main/ROADMAP.md): vision, shipped versions, what's next
 - [CHANGELOG](https://raw.githubusercontent.com/Sergio-prog/chainq/main/CHANGELOG.md): release notes per version
 
