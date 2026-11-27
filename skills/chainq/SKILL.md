@@ -31,6 +31,7 @@ If `chainq --version` fails, install it (Python 3.12+): `uv tool install chainq`
 | Wallet balance or net worth | `balance`, `portfolio` | [onchain.md](references/onchain.md) |
 | What an address is | `address` | [onchain.md](references/onchain.md) |
 | Gas, transactions, raw RPC, EVM utilities | `gas`, `tx`, `rpc`, `evm ...` | [onchain.md](references/onchain.md) |
+| Contract state or balance at a past time | `evm call/storage/code/nonce --at`, `balance --at`, `evm find-block` | [onchain.md](references/onchain.md) |
 | Unknown token symbol | `tokens search` | [onchain.md](references/onchain.md) |
 | Where to earn yield on an asset | `yields --asset X` | [defi.md](references/defi.md) |
 | Lending markets, DEX pools, protocol TVL and fees | `protocols aave/morpho/kamino/pendle/uniswap/curve/aerodrome/llama` | [defi.md](references/defi.md) |

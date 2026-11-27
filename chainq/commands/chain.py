@@ -10,6 +10,7 @@ from web3.exceptions import TransactionNotFound
 from web3.types import RPCEndpoint
 
 from chainq import catalog, pricing, solana
+from chainq.commands.evm_chain import AtOpt, at_fields, at_suffix, at_verbose, state_block
 from chainq.errors import ChainqError
 from chainq.evm_address import resolve_address
 from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_usd, short_addr
@@ -61,7 +62,7 @@ def networks(
     out.emit(data, lines, quiet_value="\n".join(NETWORKS), verbose_lines=verbose_lines)
 
 
-def _erc20_snapshot(client, token_address: str, holder: str) -> tuple[int, str, int]:
+def _erc20_snapshot(client, token_address: str, holder: str, block: str | int = "latest") -> tuple[int, str, int]:
     try:
         raw, decimals, symbol = multicall(
             client,
@@ -70,6 +71,7 @@ def _erc20_snapshot(client, token_address: str, holder: str) -> tuple[int, str, 
                 (token_address, encode_erc20("decimals")),
                 (token_address, encode_erc20("symbol")),
             ],
+            block=block,
         )
         if decimals is None or symbol is None:
             raise ChainqError(f"{token_address} does not look like an ERC-20 token")
@@ -79,9 +81,9 @@ def _erc20_snapshot(client, token_address: str, holder: str) -> tuple[int, str, 
     except Exception:
         contract = erc20(client, token_address)
         return (
-            contract.functions.balanceOf(holder).call(),
-            contract.functions.symbol().call(),
-            contract.functions.decimals().call(),
+            contract.functions.balanceOf(holder).call(block_identifier=block),
+            contract.functions.symbol().call(block_identifier=block),
+            contract.functions.decimals().call(block_identifier=block),
         )
 
 
@@ -114,35 +116,40 @@ def balance(
         str | None, typer.Option("--coin", "-c", help="token symbol or contract/mint address; omit for native")
     ] = None,
     network: NetworkOpt = "ethereum",
+    at: AtOpt = None,
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
     format: FormatOpt = "text",
 ):
-    """Get native or token balance of an address."""
+    """Get native or token balance of an address, now or at a past time (--at)."""
     out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
     if net.kind != "solana" and solana.looks_like_solana(address):
         net = resolve_network("solana")
+    found = None
     if net.kind == "solana":
+        if at is not None:
+            raise ChainqError("--at is supported on EVM networks only")
         addr, amount, symbol, token_address, price, price_source = _solana_balance(address, coin, net)
         rpc_note = "solana rpc"
     else:
         addr = resolve_address(address)
         client = connect(net)
         rpc_note = f"rpc: {client.url}"
+        block, found = state_block(client, "latest", at)
         if coin is None:
-            wei = client.w3.eth.get_balance(addr)
+            wei = client.w3.eth.get_balance(addr, block)
             amount = Decimal(wei) / Decimal(10**18)
             symbol = net.native_symbol
-            price = coingecko.try_price_usd(net.native_coingecko_id)
+            price = None if found else coingecko.try_price_usd(net.native_coingecko_id)
             price_source = "coingecko"
             token_address = None
         else:
             token_address = resolve_token(coin, net)
-            raw, symbol, decimals = _erc20_snapshot(client, token_address, addr)
+            raw, symbol, decimals = _erc20_snapshot(client, token_address, addr, block)
             amount = Decimal(raw) / Decimal(10**decimals)
-            price, price_source = _token_price(net, symbol, token_address, amount)
+            price, price_source = (None, None) if found else _token_price(net, symbol, token_address, amount)
     usd_value = float(amount) * price if price is not None else None
     data = {
         "address": addr,
@@ -153,16 +160,19 @@ def balance(
         "amount": str(amount),
         "price_usd": price,
         "value_usd": usd_value,
+        **({"block": found.block.number, **at_fields(found)} if found else {}),
     }
     label = f"{address} ({short_addr(addr)})" if address != addr else short_addr(addr)
     text = f"{dim(f'{label} on {net.name}:')} {bold(f'{fmt_amount(amount)} {symbol}')}"
     if usd_value is not None:
         text += f" (~{fmt_usd(usd_value)})"
+    text += at_suffix(found)
     out.emit(
         data,
         text,
         quiet_value=amount,
         verbose_lines=[
+            *at_verbose(found),
             rpc_note,
             f"address: {addr}",
             *([f"token: {token_address}"] if token_address else []),

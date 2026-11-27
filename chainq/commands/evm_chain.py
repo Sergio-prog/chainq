@@ -4,17 +4,21 @@ from typing import Annotated
 
 import typer
 from web3 import Web3
-from web3.exceptions import Web3RPCError
 
+from chainq.blocktime import BlockAt, block_at, format_time, parse_when
 from chainq.errors import ChainqError
 from chainq.evm import calldata, decode_abi, json_value, parse_abi_types
 from chainq.evm_address import resolve_address
-from chainq.fmt import fmt_amount, short_addr
+from chainq.fmt import dim, fmt_amount, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.rpc import connect
 
 NetworkOpt = Annotated[str, typer.Option("--network", "-n", help="EVM network key, alias, or chain id")]
+AtOpt = Annotated[
+    str | None,
+    typer.Option("--at", help="read state as of a time: ISO-8601, Unix seconds, or '3d ago' (last block at or before it)"),
+]
 
 
 def _client(network: str):
@@ -31,6 +35,36 @@ def _block_ref(value: str) -> str | int:
         return int(value, 0)
     except ValueError:
         raise ChainqError(f"invalid block reference '{value}'") from None
+
+
+def state_block(client, block_ref: str, at: str | None) -> tuple[str | int, BlockAt | None]:
+    if at is None:
+        return _block_ref(block_ref), None
+    if block_ref != "latest":
+        raise ChainqError("use either --block or --at, not both")
+    found = block_at(client, parse_when(at))
+    return found.block.number, found
+
+
+def at_fields(found: BlockAt | None) -> dict:
+    if found is None:
+        return {}
+    return {"at": datetime.fromtimestamp(found.target, tz=UTC).isoformat(), "block_timestamp": found.block.timestamp}
+
+
+def at_suffix(found: BlockAt | None) -> str:
+    if found is None:
+        return ""
+    return dim(f" @ block {found.block.number:,} ({format_time(found.block.timestamp)})")
+
+
+def at_verbose(found: BlockAt | None) -> list[str]:
+    if found is None:
+        return []
+    return [
+        f"block: {found.block.number:,} at {format_time(found.block.timestamp)}"
+        f" (resolved in {found.rounds} rounds, {found.fetched} headers, {found.seconds * 1000:.0f} ms)"
+    ]
 
 
 def _serializable(value):
@@ -79,62 +113,42 @@ def block(
 
 
 def find_block(
-    timestamp: Annotated[str, typer.Argument(help="Unix timestamp or ISO-8601 datetime")],
+    when: Annotated[str, typer.Argument(help="ISO-8601 datetime, Unix seconds, or '3d ago'")],
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
     verbose: VerboseOpt = False,
     format: FormatOpt = "text",
 ):
-    """Find the block closest to a timestamp."""
-    try:
-        target = int(timestamp)
-    except ValueError:
-        try:
-            target = int(datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp())
-        except ValueError:
-            raise ChainqError("timestamp must be Unix seconds or ISO-8601") from None
+    """Find the block closest to a time (and the last block at or before it)."""
+    target = parse_when(when)
     net, client = _client(network)
-    latest = client.w3.eth.get_block("latest")
-    sample_number = max(latest["number"] - 5000, 0)
-    try:
-        sample = client.w3.eth.get_block(sample_number)
-    except Web3RPCError as exc:
-        raise ChainqError(f"RPC cannot serve historical blocks on {net.name}: {exc}") from None
-    elapsed = latest["timestamp"] - sample["timestamp"]
-    seconds_per_block = max(elapsed / max(latest["number"] - sample_number, 1), 0.1)
-    guess = round(latest["number"] - (latest["timestamp"] - target) / seconds_per_block)
-    guess = min(max(guess, 0), latest["number"])
-    blocks = {latest["number"]: latest, sample["number"]: sample}
-    for _ in range(32):
-        try:
-            current = client.w3.eth.get_block(guess)
-        except Web3RPCError as exc:
-            raise ChainqError(f"RPC cannot serve the required historical block on {net.name}: {exc}") from None
-        blocks[current["number"]] = current
-        difference = current["timestamp"] - target
-        if abs(difference) <= seconds_per_block:
-            break
-        step = max(round(abs(difference) / seconds_per_block), 1)
-        next_guess = current["number"] - step if difference > 0 else current["number"] + step
-        next_guess = min(max(next_guess, 0), latest["number"])
-        if next_guess == guess:
-            break
-        guess = next_guess
-    result = min(blocks.values(), key=lambda item: abs(item["timestamp"] - target))
-    actual = datetime.fromtimestamp(result["timestamp"], tz=UTC)
+    found = block_at(client, target)
+    closest = found.closest
     data = {
         "network": net.key,
-        "block_number": result["number"],
-        "timestamp": result["timestamp"],
-        "datetime": actual.isoformat(),
-        "difference_seconds": result["timestamp"] - target,
+        "target": target,
+        "block_number": closest.number,
+        "timestamp": closest.timestamp,
+        "datetime": datetime.fromtimestamp(closest.timestamp, tz=UTC).isoformat(),
+        "difference_seconds": closest.timestamp - target,
+        "at_or_before": found.block.number,
+        "at_or_before_timestamp": found.block.timestamp,
+        "rounds": found.rounds,
+        "headers_fetched": found.fetched,
+        "elapsed_ms": round(found.seconds * 1000),
     }
+    text = (
+        f"{dim(f'Closest {net.name} block:')} {closest.number:,} {dim('at')} {format_time(closest.timestamp)}"
+        f" {dim(f'({data['difference_seconds']:+d}s)')}"
+    )
+    if closest != found.block:
+        text += dim(f"  at-or-before: {found.block.number:,}")
     Out(json_out, quiet, verbose, format).emit(
         data,
-        f"Closest {net.name} block: {result['number']:,} at {actual:%Y-%m-%d %H:%M:%S UTC} ({data['difference_seconds']:+d}s)",
-        quiet_value=result["number"],
-        verbose_lines=[f"rpc: {client.url}"],
+        text,
+        quiet_value=closest.number,
+        verbose_lines=[*at_verbose(found), f"rpc: {client.url}"],
     )
 
 
@@ -177,6 +191,7 @@ def chain_id(
 def nonce(
     address: Annotated[str, typer.Argument(help="address or ENS name")],
     block_ref: Annotated[str, typer.Option("--block", help="block number or tag")] = "latest",
+    at: AtOpt = None,
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -186,18 +201,20 @@ def nonce(
     """Get an account transaction count."""
     net, client = _client(network)
     resolved = resolve_address(address)
-    value = client.w3.eth.get_transaction_count(resolved, _block_ref(block_ref))
+    block, found = state_block(client, block_ref, at)
+    value = client.w3.eth.get_transaction_count(resolved, block)
     Out(json_out, quiet, verbose, format).emit(
-        {"network": net.key, "address": resolved, "nonce": value, "block": block_ref},
-        f"{short_addr(resolved)} nonce on {net.name}: {value}",
+        {"network": net.key, "address": resolved, "nonce": value, "block": block, **at_fields(found)},
+        f"{short_addr(resolved)} nonce on {net.name}: {value}{at_suffix(found)}",
         quiet_value=value,
-        verbose_lines=[f"address: {resolved}", f"rpc: {client.url}"],
+        verbose_lines=[f"address: {resolved}", *at_verbose(found), f"rpc: {client.url}"],
     )
 
 
 def code(
     address: Annotated[str, typer.Argument(help="contract address or ENS name")],
     block_ref: Annotated[str, typer.Option("--block", help="block number or tag")] = "latest",
+    at: AtOpt = None,
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -207,13 +224,21 @@ def code(
     """Get contract bytecode."""
     net, client = _client(network)
     resolved = resolve_address(address)
-    value = Web3.to_hex(client.w3.eth.get_code(resolved, _block_ref(block_ref)))
-    data = {"network": net.key, "address": resolved, "bytecode": value, "size_bytes": len(bytes.fromhex(value[2:]))}
+    block, found = state_block(client, block_ref, at)
+    value = Web3.to_hex(client.w3.eth.get_code(resolved, block))
+    data = {
+        "network": net.key,
+        "address": resolved,
+        "bytecode": value,
+        "size_bytes": len(bytes.fromhex(value[2:])),
+        "block": block,
+        **at_fields(found),
+    }
     Out(json_out, quiet, verbose, format).emit(
         data,
-        f"{short_addr(resolved)} on {net.name}: {data['size_bytes']:,} bytes of code",
+        f"{short_addr(resolved)} on {net.name}: {data['size_bytes']:,} bytes of code{at_suffix(found)}",
         quiet_value=value,
-        verbose_lines=[f"address: {resolved}", f"rpc: {client.url}"],
+        verbose_lines=[f"address: {resolved}", *at_verbose(found), f"rpc: {client.url}"],
     )
 
 
@@ -221,6 +246,7 @@ def storage(
     address: Annotated[str, typer.Argument(help="contract address or ENS name")],
     slot: Annotated[str, typer.Argument(help="storage slot (decimal or hex)")],
     block_ref: Annotated[str, typer.Option("--block", help="block number or tag")] = "latest",
+    at: AtOpt = None,
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -234,13 +260,14 @@ def storage(
         slot_number = int(slot, 0)
     except ValueError:
         raise ChainqError(f"invalid storage slot '{slot}'") from None
-    value = Web3.to_hex(client.w3.eth.get_storage_at(resolved, slot_number, _block_ref(block_ref)))
-    data = {"network": net.key, "address": resolved, "slot": slot_number, "value": value, "block": block_ref}
+    block, found = state_block(client, block_ref, at)
+    value = Web3.to_hex(client.w3.eth.get_storage_at(resolved, slot_number, block))
+    data = {"network": net.key, "address": resolved, "slot": slot_number, "value": value, "block": block, **at_fields(found)}
     Out(json_out, quiet, verbose, format).emit(
         data,
-        f"{short_addr(resolved)} slot {slot_number} on {net.name}: {value}",
+        f"{short_addr(resolved)} slot {slot_number} on {net.name}: {value}{at_suffix(found)}",
         quiet_value=value,
-        verbose_lines=[f"address: {resolved}", f"rpc: {client.url}"],
+        verbose_lines=[f"address: {resolved}", *at_verbose(found), f"rpc: {client.url}"],
     )
 
 
@@ -250,6 +277,7 @@ def call(
     arguments: Annotated[str | None, typer.Argument(help="JSON array of function arguments")] = None,
     returns: Annotated[str | None, typer.Option("--returns", help="comma-separated output ABI types")] = None,
     block_ref: Annotated[str, typer.Option("--block", help="block number or tag")] = "latest",
+    at: AtOpt = None,
     network: NetworkOpt = "ethereum",
     json_out: JsonOpt = False,
     quiet: QuietOpt = False,
@@ -260,7 +288,8 @@ def call(
     net, client = _client(network)
     resolved = resolve_address(address)
     data_hex = calldata(signature, arguments)
-    raw = Web3.to_hex(client.w3.eth.call({"to": resolved, "data": data_hex}, _block_ref(block_ref)))
+    block, found = state_block(client, block_ref, at)
+    raw = Web3.to_hex(client.w3.eth.call({"to": resolved, "data": data_hex}, block))
     decoded = None
     if returns:
         decoded = json_value(decode_abi(parse_abi_types(returns), raw))
@@ -271,13 +300,15 @@ def call(
         "calldata": data_hex,
         "raw": raw,
         "decoded": decoded,
+        "block": block,
+        **at_fields(found),
     }
     display = json.dumps(decoded, separators=(",", ":")) if decoded is not None else raw
     Out(json_out, quiet, verbose, format).emit(
         data,
-        f"{signature} on {short_addr(resolved)}: {display}",
+        f"{signature} on {short_addr(resolved)}: {display}{at_suffix(found)}",
         quiet_value=display,
-        verbose_lines=[f"calldata: {data_hex}", f"rpc: {client.url}"],
+        verbose_lines=[f"calldata: {data_hex}", *at_verbose(found), f"rpc: {client.url}"],
     )
 
 

@@ -1,8 +1,12 @@
 import os
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
+from requests import HTTPError
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 from web3.providers import JSONBaseProvider
@@ -162,30 +166,36 @@ def _decode_aggregate3(data: bytes) -> list[bytes | None]:
     return results
 
 
-def _aggregate3(client: "ChainClient", calls: list[tuple[str, bytes]]) -> list[bytes | None]:
-    raw = client.w3.eth.call({"to": MULTICALL3_ADDRESS, "data": _encode_aggregate3(calls)})
+def _aggregate3(client: "ChainClient", calls: list[tuple[str, bytes]], block: str | int) -> list[bytes | None]:
+    raw = client.w3.eth.call({"to": MULTICALL3_ADDRESS, "data": _encode_aggregate3(calls)}, block)
     return _decode_aggregate3(bytes(raw))
 
 
-def multicall(client: "ChainClient", calls: list[tuple[str, bytes]], chunk: int = MULTICALL_CHUNK) -> list[bytes | None]:
+def multicall(
+    client: "ChainClient",
+    calls: list[tuple[str, bytes]],
+    chunk: int = MULTICALL_CHUNK,
+    block: str | int = "latest",
+) -> list[bytes | None]:
     if not calls:
         return []
     results: list[bytes | None] = []
     for start in range(0, len(calls), chunk):
         batch = calls[start : start + chunk]
         try:
-            results.extend(_aggregate3(client, batch))
+            results.extend(_aggregate3(client, batch, block))
         except Exception:
             if chunk <= MULTICALL_MIN_CHUNK:
                 raise
-            results.extend(multicall(client, batch, chunk // 2))
+            results.extend(multicall(client, batch, chunk // 2, block))
     return results
 
 
 FAILOVER_ERROR_CODES = {-32004, -32005, -32601, -32603}
 FAILOVER_MESSAGE = re.compile(
     r"rate limit|too many|limit exceeded|not supported|unsupported|upstream|unavailable"
-    r"|timed? ?out|forbidden|capacity|overloaded|not able to process",
+    r"|timed? ?out|forbidden|capacity|overloaded|not able to process"
+    r"|missing trie node|historical state|state histor|archive|pruned|usage limit|limit reached",
     re.IGNORECASE,
 )
 
@@ -204,10 +214,45 @@ def is_provider_error(response: RPCResponse) -> bool:
     return error.get("code") in FAILOVER_ERROR_CODES or bool(FAILOVER_MESSAGE.search(str(error.get("message", ""))))
 
 
+BATCH_SIZE = 10
+BATCH_PARALLEL = 8
+HISTORY_MISSING = re.compile(r"missing trie node|historical state|state histor|archive|pruned", re.IGNORECASE)
+BATCH_BACKOFF = 1.0
+CHUNK_RETRIES = 2
+CHUNK_BACKOFF = 0.3
+RATE_LIMITED = re.compile(r"HTTP 429|rate limit|limit reached|too many", re.IGNORECASE)
+BATCH_REJECTED = re.compile(r"batch", re.IGNORECASE)
+BATCH_CAP = re.compile(r"(?:more than|maximum of|over|exceeds?)\D{0,20}(\d+)", re.IGNORECASE)
+
+
+UNSUPPORTED_CODES = {-32601, -32600, -32611}
+
+
+def is_unsupported(response: RPCResponse) -> bool:
+    error = response.get("error")
+    if not isinstance(error, dict):
+        return False
+    return error.get("code") in UNSUPPORTED_CODES or "method" in str(error.get("message", "")).lower()
+
+
+class BatchTooLarge(Exception):
+    def __init__(self, limit: int | None):
+        super().__init__(f"batch limit {limit}")
+        self.limit = limit
+
+
+def batch_limit(message: str) -> BatchTooLarge | None:
+    if not BATCH_REJECTED.search(message):
+        return None
+    match = BATCH_CAP.search(message)
+    return BatchTooLarge(int(match.group(1)) if match else None)
+
+
 class FallbackProvider(JSONBaseProvider):
-    def __init__(self, urls: list[str], chain_id: int):
+    def __init__(self, urls: list[str], chain_id: int, key: str | None = None):
         super().__init__()
         self.chain_id = chain_id
+        self.key = key
         self.providers = [
             HTTPProvider(url, request_kwargs={"timeout": settings.rpc_timeout}, exception_retry_configuration=None)
             for url in urls
@@ -215,6 +260,8 @@ class FallbackProvider(JSONBaseProvider):
         self.active = 0
         self.verified: set[int] = set()
         self.dead: set[int] = set()
+        self.batch_sizes: dict[int, int] = {}
+        self.variants: dict[int, int] = {}
 
     @property
     def url(self) -> str:
@@ -232,12 +279,20 @@ class FallbackProvider(JSONBaseProvider):
             raise ChainqError(f"wrong chain id {chain_id}")
         self.verified.add(index)
 
+    def _order(self) -> list[int]:
+        order = [*range(self.active, len(self.providers)), *range(self.active)]
+        return [index for index in order if index not in self.dead]
+
+    def discard_active(self) -> None:
+        self.dead.add(self.active)
+
+    @property
+    def alive(self) -> bool:
+        return bool(self._order())
+
     def make_request(self, method: RPCEndpoint, params: Any) -> RPCResponse:
         failures = []
-        order = [*range(self.active, len(self.providers)), *range(self.active)]
-        for index in order:
-            if index in self.dead:
-                continue
+        for index in self._order():
             provider = self.providers[index]
             try:
                 self._verify(index)
@@ -250,7 +305,100 @@ class FallbackProvider(JSONBaseProvider):
                 continue
             self.active = index
             return response
-        raise ChainqError(f"all RPC endpoints failed for {method}: {'; '.join(failures)}")
+        message = f"all RPC endpoints failed for {method}: {'; '.join(failures)}"
+        if self.key and HISTORY_MISSING.search(message):
+            message += f". Historical state needs an archive RPC: set CHAINQ_RPC_{self.key.upper()}=<url>"
+        raise ChainqError(message)
+
+    def batch(self, *variants: list[tuple[str, Any]]) -> list[RPCResponse]:
+        try:
+            return self._batch_once(variants)
+        except ChainqError as exc:
+            if not RATE_LIMITED.search(str(exc)):
+                raise
+        time.sleep(BATCH_BACKOFF)
+        return self._batch_once(variants)
+
+    def _batch_once(self, variants: tuple[list[tuple[str, Any]], ...]) -> list[RPCResponse]:
+        failures = []
+        for index in self._order():
+            provider = self.providers[index]
+            try:
+                self._verify(index)
+                responses = self._batch_variants(index, variants)
+            except Exception as exc:
+                failures.append(f"{provider.endpoint_uri} ({describe_failure(exc)})")
+                continue
+            rejected = next((item for item in responses if is_provider_error(item)), None)
+            if rejected:
+                failures.append(f"{provider.endpoint_uri} ({rejected['error'].get('message')})")
+                continue
+            self.active = index
+            return responses
+        raise ChainqError(f"all RPC endpoints failed for batch: {'; '.join(failures)}")
+
+    def _batch_variants(self, index: int, variants: tuple[list[tuple[str, Any]], ...]) -> list[RPCResponse]:
+        position = min(self.variants.get(index, 0), len(variants) - 1)
+        while True:
+            responses = self._batch_at(index, variants[position])
+            if position + 1 < len(variants) and any(is_unsupported(item) for item in responses):
+                position += 1
+                self.variants[index] = position
+                continue
+            return responses
+
+    def _batch_at(self, index: int, calls: list[tuple[str, Any]]) -> list[RPCResponse]:
+        while True:
+            size = self.batch_sizes.get(index, BATCH_SIZE)
+            chunks = [calls[start : start + size] for start in range(0, len(calls), size)]
+            send = partial(self._send_chunk, index)
+            try:
+                if len(chunks) == 1:
+                    parts = [send(chunks[0])]
+                else:
+                    with ThreadPoolExecutor(min(len(chunks), BATCH_PARALLEL)) as pool:
+                        parts = list(pool.map(send, chunks))
+            except BatchTooLarge as exc:
+                if size == 1:
+                    raise
+                self.batch_sizes[index] = max(1, min(exc.limit or size // 2, size - 1))
+                continue
+            return [item for part in parts for item in part]
+
+    def _send_chunk(self, index: int, chunk: list[tuple[str, Any]]) -> list[RPCResponse]:
+        for attempt in range(CHUNK_RETRIES):
+            try:
+                responses = self._post_chunk(index, chunk)
+            except HTTPError as exc:
+                if exc.response is None or exc.response.status_code != 429:
+                    raise
+            else:
+                if not any(RATE_LIMITED.search(str(item["error"])) for item in responses if "error" in item):
+                    return responses
+            time.sleep(CHUNK_BACKOFF * (attempt + 1))
+        return self._post_chunk(index, chunk)
+
+    def _post_chunk(self, index: int, chunk: list[tuple[str, Any]]) -> list[RPCResponse]:
+        provider = self.providers[index]
+        if len(chunk) == 1:
+            return [provider.make_request(RPCEndpoint(chunk[0][0]), chunk[0][1])]
+        try:
+            response = provider.make_batch_request([(RPCEndpoint(method), params) for method, params in chunk])
+        except HTTPError as exc:
+            rejection = batch_limit(exc.response.text if exc.response is not None else "")
+            if rejection:
+                raise rejection from None
+            raise
+        if not isinstance(response, list):
+            message = str(response.get("error"))
+            raise batch_limit(message) or ChainqError(f"batch failed: {message}")
+        for item in response:
+            rejection = batch_limit(str(item["error"])) if "error" in item else None
+            if rejection:
+                raise rejection
+        if len(response) != len(chunk):
+            raise ChainqError("batch response size mismatch")
+        return response
 
 
 @dataclass
@@ -269,7 +417,7 @@ def connect(network: Network) -> ChainClient:
     override = os.environ.get(f"CHAINQ_RPC_{network.key.upper()}")
     if override:
         urls.insert(0, override)
-    provider = FallbackProvider(urls, network.chain_id)
+    provider = FallbackProvider(urls, network.chain_id, network.key)
     w3 = Web3(provider)
     w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
     return ChainClient(w3=w3, network=network, provider=provider)

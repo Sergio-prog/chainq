@@ -154,7 +154,9 @@ chainq rpc eth_blockNumber -n optimism                # raw JSON-RPC escape hatc
 
 ```bash
 chainq evm block-number -n base                       # latest block
-chainq evm find-block 2026-07-01T12:00:00Z            # block closest to a timestamp
+chainq evm find-block 2026-07-01T12:00:00Z            # block closest to a timestamp ("3d ago" works too)
+chainq evm call 0xWETH 'totalSupply()' --returns uint256 --at 2023-01-01   # contract state at a past time
+chainq balance vitalik.eth -c usdc --at "2024-06-01 12:00"                 # balance as of a date
 chainq evm code 0xContract -n base                    # contract bytecode
 chainq evm storage 0xContract 0 -n base               # storage word at a slot
 chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256
@@ -164,6 +166,8 @@ chainq evm abi-encode 'address,uint256' '["0xTo",1]'
 chainq evm keccak 'hello'                              # Keccak-256 of UTF-8 text
 chainq evm to-wei 1.5 ether                            # 1500000000000000000
 ```
+
+`--at` (on `call`, `storage`, `code`, `nonce`, and `balance`) maps a time to a block with a batched, cached interpolation search over block headers, usually in 1–3 round trips. Old state needs an archive RPC; override one with `CHAINQ_RPC_<NETWORK>`.
 
 Every subcommand takes `--json`, `-q`, `-v`, and `--format`. For cross-chain work, `chainq balance`, `gas`, `tx`, and `rpc` are the main commands.
 

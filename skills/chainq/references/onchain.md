@@ -71,3 +71,13 @@ chainq evm sig 'transfer(address,uint256)'
 chainq evm call 0xToken 'balanceOf(address)' '["0xHolder"]' --returns uint256 -n base
 chainq evm abi-decode 'address,uint256' 0x...
 ```
+
+## Time travel
+
+`evm call`, `evm storage`, `evm code`, `evm nonce`, and `balance` take `--at <time>` (ISO-8601, Unix seconds, or `3d ago`). They read state at the last block at or before that time. `evm find-block <time>` returns the closest block plus `at_or_before`. The block lookup is a batched interpolation search over headers, cached per chain, and usually takes 150–400 ms. Old state needs an archive RPC. Most networks have a public one and chainq fails over to it. Arbitrum, Blast, and Robinhood don't, so set `CHAINQ_RPC_<NETWORK>` there. `balance --at` omits USD values.
+
+```bash
+chainq evm call 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 'totalSupply()' --returns uint256 --at 2023-01-01
+chainq balance vitalik.eth -c usdc --at "2024-06-01 12:00"
+chainq evm find-block "7d ago" -n base -q
+```
