@@ -2,12 +2,38 @@
 
 Generated from conventional commits (`scripts/gen_changelog.py`).
 
+## v0.25.0
+
+### Features
+- time-travel state reads with fast block-by-timestamp search
+- trim float noise in structured output to 10 significant digits
+- add chainq schema and plain help when piped
+
+### Fixes
+- report partial failures and harden cache and http retries
+
+### Performance
+- index catalog lookups by address
+- lazy-load commands and drop pydantic-settings for faster startup
+
+### Documentation
+- split SKILL.md into a lean core with references and unslop docs; bump to 0.24.2
+- describe provider and wallet seams in AGENTS.md; bump to 0.24.1
+
+### Refactoring
+- remove dead helpers (sweep_balances, scale_to_base/from_base, TOP_SORTS)
+- reuse the wallet sweep in address instead of a copy
+- extract wallet scanning from the portfolio command into chainq.wallets
+- move protocol row builders into providers so yields stops importing private command helpers
+- share provider fetch, error mapping and caching
+
 ## v0.23.0
 
 ### Features
 - bulk multi-wallet portfolio with table views, clipboard input, and scan cache
 
 ### Documentation
+- regenerate release references for v0.23.0
 - add install instructions to agent skill
 
 ## v0.22.1
