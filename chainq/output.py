@@ -2,14 +2,15 @@ import io
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.console import Console, RenderableType
-from rich.measure import Measurement
 
 from chainq.errors import ChainqError
 from chainq.fmt import color_enabled, dim, fmt_amount
+
+if TYPE_CHECKING:
+    from rich.console import RenderableType
 
 FORMATS = ("text", "json", "table", "toon")
 
@@ -17,6 +18,19 @@ JsonOpt = Annotated[bool, typer.Option("--json", help="structured JSON output (s
 QuietOpt = Annotated[bool, typer.Option("--quiet", "-q", help="bare primary value only (pipe-friendly)")]
 VerboseOpt = Annotated[bool, typer.Option("--verbose", "-v", help="extra detail (sources, endpoints, raw fields)")]
 FormatOpt = Annotated[str, typer.Option("--format", "-f", help="output format: text | json | table | toon")]
+
+
+FLOAT_DIGITS = 10
+
+
+def tidy_floats(value: object) -> object:
+    if isinstance(value, float):
+        return float(f"{value:.{FLOAT_DIGITS}g}")
+    if isinstance(value, dict):
+        return {key: tidy_floats(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [tidy_floats(item) for item in value]
+    return value
 
 
 def dim_label(line: str) -> str:
@@ -28,7 +42,10 @@ def dim_label(line: str) -> str:
     return dim(line[: idx + 1]) + line[idx + 1 :]
 
 
-def render_rich(renderable: RenderableType) -> list[str]:
+def render_rich(renderable: "RenderableType") -> list[str]:
+    from rich.console import Console
+    from rich.measure import Measurement
+
     color = color_enabled()
     console = Console(file=io.StringIO(), width=10_000, force_terminal=color, no_color=not color, highlight=False)
     width = Measurement.get(console, console.options, renderable).maximum
@@ -153,6 +170,8 @@ class Out:
         quiet_value: object | None = None,
         verbose_lines: Iterable[str] = (),
     ) -> None:
+        if self.format != "text":
+            data = tidy_floats(data)
         if self.format == "json":
             print(json.dumps(data, indent=2, default=str))
             return

@@ -5,10 +5,10 @@ from typing import Annotated
 import typer
 
 from chainq.errors import ChainqError
+from chainq.evm_address import resolve_address
 from chainq.fmt import fmt_amount, fmt_pct, fmt_usd, humanize_usd, short_addr
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
 from chainq.providers import hyperliquid
-from chainq.rpc import resolve_address
 
 app = typer.Typer(no_args_is_help=True, help="Hyperliquid public market data (perps, spot, builder dexs, outcomes).")
 spot_app = typer.Typer(no_args_is_help=True, help="Hyperliquid spot markets and balances.")

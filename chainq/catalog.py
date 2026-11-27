@@ -1,11 +1,9 @@
 from dataclasses import dataclass, replace
 from functools import cache as memoize
 
-from web3 import Web3
-
 from chainq import __version__, cache, http
-from chainq.config import settings
 from chainq.errors import ChainqError
+from chainq.evm_address import checksum, is_hex_address
 from chainq.networks import NETWORKS
 from chainq.providers.coingecko_data import PLATFORM_IDS, SYMBOL_TO_ID
 from chainq.solana import is_solana_address
@@ -51,14 +49,8 @@ PENDLE_PRICES: dict[tuple[str, str], float] = {}
 
 def _fetch_json(url: str) -> object | None:
     try:
-        resp = http.get(url, headers={"User-Agent": f"chainq/{__version__}"}, timeout=settings.http_timeout)
-    except Exception:
-        return None
-    if resp.status_code != 200:
-        return None
-    try:
-        return resp.json()
-    except Exception:
+        return http.fetch_json("token list", url, headers={"User-Agent": f"chainq/{__version__}"})
+    except ChainqError:
         return None
 
 
@@ -74,12 +66,7 @@ def _load_source(name: str, url: str) -> object | None:
 
 
 def _checksum(address: object) -> str | None:
-    if not isinstance(address, str) or not address.startswith("0x") or len(address) != 42:
-        return None
-    try:
-        return Web3.to_checksum_address(address)
-    except Exception:
-        return None
+    return checksum(address) if is_hex_address(address) else None
 
 
 def _decimals(value: object) -> int | None:
@@ -182,7 +169,7 @@ def _merge(kept: CatalogToken, other: CatalogToken) -> CatalogToken:
 def _dedupe(tokens: list[CatalogToken]) -> list[CatalogToken]:
     unique: dict[str, CatalogToken] = {}
     for token in tokens:
-        key = token.address if token.network == "solana" else token.address.lower()
+        key = _address_key(token.network, token.address)
         unique[key] = _merge(unique[key], token) if key in unique else token
     return list(unique.values())
 
@@ -203,13 +190,17 @@ def tokens_for(network_key: str) -> tuple[CatalogToken, ...]:
     )
 
 
+def _address_key(network_key: str, address: str) -> str:
+    return address if network_key == "solana" else address.lower()
+
+
+@memoize
+def _by_address(network_key: str) -> dict[str, CatalogToken]:
+    return {_address_key(network_key, token.address): token for token in tokens_for(network_key)}
+
+
 def lookup(network_key: str, address: str) -> CatalogToken | None:
-    wanted = address if network_key == "solana" else address.lower()
-    for token in tokens_for(network_key):
-        candidate = token.address if network_key == "solana" else token.address.lower()
-        if candidate == wanted:
-            return token
-    return None
+    return _by_address(network_key).get(_address_key(network_key, address))
 
 
 def resolve_symbol(network_key: str, symbol: str) -> list[CatalogToken]:
@@ -231,7 +222,7 @@ def resolve_one(network_key: str, symbol: str) -> CatalogToken:
         )
     listed = ", ".join(f"{t.address} ({t.name or t.symbol}, {t.source})" for t in matches[:5])
     more = f" and {len(matches) - 5} more" if len(matches) > 5 else ""
-    raise ChainqError(f"'{symbol}' is ambiguous on {network.name}: {listed}{more} — pass the address instead")
+    raise ChainqError(f"'{symbol}' is ambiguous on {network.name}: {listed}{more}; pass the address instead")
 
 
 def search(query: str, network_key: str | None = None, limit: int = 20) -> list[CatalogToken]:
@@ -262,7 +253,12 @@ def refresh(network_keys: list[str]) -> None:
     for key in network_keys:
         for name in _blob_names(key):
             cache.drop_blob(name)
+    clear_memory_cache()
+
+
+def clear_memory_cache() -> None:
     tokens_for.cache_clear()
+    _by_address.cache_clear()
 
 
 def status(network_keys: list[str]) -> list[dict]:

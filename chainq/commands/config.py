@@ -1,13 +1,13 @@
-from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from chainq import config
 from chainq.errors import ChainqError
 
 app = typer.Typer(no_args_is_help=True, help="Manage chainq configuration (stored in ~/.config/chainq/.env).")
 
-CONFIG_PATH = Path.home() / ".config" / "chainq" / ".env"
+CONFIG_PATH = config.CONFIG_PATH
 
 KNOWN_KEYS = (
     "COINGECKO_API_KEY",
@@ -27,16 +27,7 @@ def _normalize(key: str) -> str:
 
 
 def _read() -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not CONFIG_PATH.exists():
-        return values
-    for line in CONFIG_PATH.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        values[key.strip()] = value.strip()
-    return values
+    return config.parse_env_file(CONFIG_PATH)
 
 
 def _write(values: dict[str, str]) -> None:

@@ -4,7 +4,8 @@ from typing import Annotated
 import typer
 from web3 import Web3
 
-from chainq import catalog, pricing, solana
+from chainq import catalog, pricing, solana, wallets
+from chainq.evm_address import resolve_address
 from chainq.fmt import fmt_amount, fmt_usd, short_addr
 from chainq.networks import resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
@@ -15,8 +16,6 @@ from chainq.rpc import (
     decode_uint,
     encode_erc20,
     multicall,
-    resolve_address,
-    sweep_catalog,
 )
 
 NetworkOpt = Annotated[str, typer.Option("--network", "-n", help="network key, alias, or chain id")]
@@ -78,28 +77,9 @@ def _erc20_profile(client, addr: str) -> dict | None:
 
 
 def _holdings(client, net, addr: str) -> tuple[list[dict], int, float | None, Decimal]:
-    wei, rows = sweep_catalog(client, addr, list(catalog.tokens_for(net.key)))
+    wei, tokens = wallets.sweep_evm(client, net, addr)
     native_amount = Decimal(wei) / Decimal(10**18)
-    assets = [
-        {
-            "network": net.key,
-            "symbol": net.native_symbol,
-            "token_address": None,
-            "amount": str(native_amount),
-            "coingecko_id": net.native_coingecko_id,
-        }
-    ]
-    for row in rows:
-        assets.append(
-            {
-                "network": net.key,
-                "symbol": row["symbol"],
-                "token_address": row["token_address"],
-                "amount": str(Decimal(row["raw_amount"]) / Decimal(10 ** row["decimals"])),
-                "kind": row["catalog"].kind,
-                "coingecko_id": row["catalog"].coingecko_id,
-            }
-        )
+    assets = [wallets.native_asset(net, wei), *tokens]
     pricing.price_assets(assets)
     native_price = assets[0]["price_usd"]
     holdings = [
@@ -115,7 +95,7 @@ def _holdings(client, net, addr: str) -> tuple[list[dict], int, float | None, De
         if a["value_usd"] is not None
     ]
     holdings.sort(key=lambda h: -h["value_usd"])
-    return holdings, len(rows) - len(holdings), native_price, native_amount
+    return holdings, len(tokens) - len(holdings), native_price, native_amount
 
 
 def _evm_address(out: Out, target: str, net) -> None:

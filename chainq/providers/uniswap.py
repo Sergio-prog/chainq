@@ -1,7 +1,5 @@
-import httpx
 
 from chainq import cache, http
-from chainq.config import settings
 from chainq.errors import ChainqError
 
 SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
@@ -13,19 +11,7 @@ LLAMA_SUMMARY_URL = "https://api.llama.fi/summary/dexs/uniswap"
 
 
 def _get(url: str, params: dict | None = None, ttl: float = 60) -> dict:
-    key = cache.key_for("uniswap", url, params)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-    try:
-        resp = http.get(url, params=params or {}, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"request failed: {exc}") from exc
-    if resp.status_code >= 400:
-        raise ChainqError(f"{url} returned HTTP {resp.status_code}")
-    result = resp.json()
-    cache.put(key, result, ttl)
-    return result
+    return cache.remember(("uniswap", url, params), ttl, lambda: http.fetch_json("DexScreener", url, params=params or {}))
 
 
 def _pair_row(pair: dict) -> dict:

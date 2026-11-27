@@ -18,27 +18,6 @@ SORT_KEYS = {
 }
 
 
-def _market_label(name: str) -> str:
-    return name.removeprefix("AaveV3") or name
-
-
-def _reserve_row(market: dict, reserve: dict) -> dict:
-    supply = reserve.get("supplyInfo") or {}
-    borrow = reserve.get("borrowInfo") or {}
-    return {
-        "market": _market_label(market["name"]),
-        "symbol": (reserve.get("underlyingToken") or {}).get("symbol"),
-        "supply_apy_pct": float(supply["apy"]["value"]) * 100 if supply.get("apy") else None,
-        "borrow_apy_pct": float(borrow["apy"]["value"]) * 100 if borrow.get("apy") else None,
-        "supplied_usd": float(reserve["size"]["usd"]) if reserve.get("size") else None,
-        "borrowed_usd": float(borrow["total"]["usd"]) if borrow.get("total") else None,
-        "available_usd": float(borrow["availableLiquidity"]["usd"]) if borrow.get("availableLiquidity") else None,
-        "utilization_pct": float(borrow["utilizationRate"]["value"]) * 100 if borrow.get("utilizationRate") else None,
-        "collateral": supply.get("canBeCollateral"),
-        "frozen": reserve.get("isFrozen"),
-    }
-
-
 def _row_line(r: dict) -> str:
     borrow = f"borrow {fmt_pct(r['borrow_apy_pct'], signed=False)}" if r["borrow_apy_pct"] is not None else "not borrowable"
     util = f"  util {fmt_pct(r['utilization_pct'], signed=False)}" if r["utilization_pct"] is not None else ""
@@ -68,7 +47,7 @@ def markets(
     if not aave_markets:
         raise ChainqError(f"no Aave v3 market on {net.name}")
     rows = [
-        _reserve_row(market, reserve)
+        aave.reserve_row(market, reserve)
         for market in aave_markets
         for reserve in market.get("reserves") or []
         if not reserve.get("isPaused")
@@ -83,7 +62,7 @@ def markets(
     header = (
         f"Aave v3 on {net.name}: {humanize_usd(total)} total market size, "
         f"{len(aave_markets)} market{'s' if len(aave_markets) != 1 else ''} "
-        f"({', '.join(_market_label(m['name']) for m in aave_markets)})"
+        f"({', '.join(aave.market_label(m['name']) for m in aave_markets)})"
     )
     out.emit(
         {"network": net.key, "total_market_size_usd": total, "reserves": rows},

@@ -1,20 +1,12 @@
-import httpx
 
 from chainq import http
-from chainq.config import settings
 from chainq.errors import ChainqError
 
 INFO_URL = "https://api.hyperliquid.xyz/info"
 
 
 def info(payload: dict) -> dict | list:
-    try:
-        resp = http.post(INFO_URL, json=payload, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"Hyperliquid request failed: {exc}") from exc
-    if resp.status_code >= 400:
-        raise ChainqError(f"Hyperliquid returned HTTP {resp.status_code}")
-    return resp.json()
+    return http.fetch_json("Hyperliquid", INFO_URL, method="POST", json=payload)
 
 
 def perp_markets(dex: str = "") -> list[dict]:

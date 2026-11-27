@@ -1,10 +1,16 @@
 import hashlib
 import json
+import os
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 CACHE_DIR = Path.home() / ".cache" / "chainq"
 CACHE_FILE = CACHE_DIR / "http-cache.json"
+
+_lock = threading.Lock()
+_snapshot: tuple[Path, int, dict] | None = None
 
 
 def key_for(*parts: object) -> str:
@@ -12,17 +18,30 @@ def key_for(*parts: object) -> str:
 
 
 def _load() -> dict:
+    global _snapshot
     try:
-        return json.loads(CACHE_FILE.read_text())
+        mtime = CACHE_FILE.stat().st_mtime_ns
+        if _snapshot is not None and _snapshot[:2] == (CACHE_FILE, mtime):
+            return _snapshot[2]
+        data = json.loads(CACHE_FILE.read_text())
     except Exception:
         return {}
+    _snapshot = (CACHE_FILE, mtime, data)
+    return data
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(text)
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _store(data: dict) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = CACHE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, default=str))
-    tmp.replace(CACHE_FILE)
+    _write_atomic(CACHE_FILE, json.dumps(data, default=str))
 
 
 def get(key: str) -> object | None:
@@ -38,6 +57,17 @@ def get_many(keys: list[str]) -> dict[str, object]:
     return {k: data[k]["value"] for k in keys if k in data and data[k].get("expires_at", 0) > now}
 
 
+def remember[T](parts: tuple, ttl: float, compute: Callable[[], T]) -> T:
+    key = key_for(*parts)
+    cached = get(key)
+    if cached is not None:
+        return cached
+    value = compute()
+    if value is not None:
+        put(key, value, ttl)
+    return value
+
+
 def put(key: str, value: object, ttl: float) -> None:
     put_many({key: value}, ttl)
 
@@ -45,13 +75,14 @@ def put(key: str, value: object, ttl: float) -> None:
 def put_many(values: dict[str, object], ttl: float) -> None:
     if not values:
         return
-    now = time.time()
-    data = {k: v for k, v in _load().items() if v.get("expires_at", 0) > now}
-    data.update({key: {"expires_at": now + ttl, "value": value} for key, value in values.items()})
-    try:
-        _store(data)
-    except OSError:
-        pass
+    with _lock:
+        now = time.time()
+        data = {k: v for k, v in _load().items() if v.get("expires_at", 0) > now}
+        data.update({key: {"expires_at": now + ttl, "value": value} for key, value in values.items()})
+        try:
+            _store(data)
+        except OSError:
+            pass
 
 
 BLOB_DIR = CACHE_DIR / "blobs"
@@ -82,11 +113,7 @@ def blob_age(name: str) -> float | None:
 
 def put_blob(name: str, value: object) -> None:
     try:
-        BLOB_DIR.mkdir(parents=True, exist_ok=True)
-        path = _blob_path(name)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"fetched_at": time.time(), "value": value}, default=str))
-        tmp.replace(path)
+        _write_atomic(_blob_path(name), json.dumps({"fetched_at": time.time(), "value": value}, default=str))
     except OSError:
         pass
 

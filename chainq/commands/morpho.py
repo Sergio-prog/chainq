@@ -22,36 +22,6 @@ def _pct(value: float | None) -> str:
     return fmt_pct(value, signed=False)
 
 
-def _market_row(m: dict) -> dict:
-    state = m.get("state") or {}
-    lltv = float(m["lltv"]) / 1e18 * 100 if m.get("lltv") else None
-    return {
-        "collateral": (m.get("collateralAsset") or {}).get("symbol") or "idle",
-        "loan": (m.get("loanAsset") or {}).get("symbol"),
-        "lltv_pct": lltv,
-        "supply_apy_pct": state["supplyApy"] * 100 if state.get("supplyApy") is not None else None,
-        "net_supply_apy_pct": state["netSupplyApy"] * 100 if state.get("netSupplyApy") is not None else None,
-        "borrow_apy_pct": state["borrowApy"] * 100 if state.get("borrowApy") is not None else None,
-        "net_borrow_apy_pct": state["netBorrowApy"] * 100 if state.get("netBorrowApy") is not None else None,
-        "supplied_usd": state.get("supplyAssetsUsd"),
-        "borrowed_usd": state.get("borrowAssetsUsd"),
-        "utilization_pct": state["utilization"] * 100 if state.get("utilization") is not None else None,
-        "market_id": m.get("marketId"),
-    }
-
-
-def _vault_row(vault: dict) -> dict:
-    state = vault.get("state") or {}
-    return {
-        "name": vault.get("name"),
-        "symbol": vault.get("symbol"),
-        "asset": (vault.get("asset") or {}).get("symbol"),
-        "apy_pct": state["apy"] * 100 if state.get("apy") is not None else None,
-        "net_apy_pct": state["netApy"] * 100 if state.get("netApy") is not None else None,
-        "tvl_usd": state.get("totalAssetsUsd"),
-    }
-
-
 @app.command()
 def markets(
     network: Annotated[str, typer.Option("--network", "-n", help="network key, alias, or chain id")] = "ethereum",
@@ -68,7 +38,7 @@ def markets(
     if sort not in MARKET_SORT:
         raise ChainqError(f"unknown sort '{sort}' (use: {', '.join(MARKET_SORT)})")
     net = resolve_network(network)
-    rows = [_market_row(m) for m in morpho.markets(net.chain_id)]
+    rows = [morpho.market_row(m) for m in morpho.markets(net.chain_id)]
     if not rows:
         raise ChainqError(f"no Morpho markets on {net.name}")
     if coin:
@@ -109,7 +79,7 @@ def vaults(
     """Morpho vaults ranked by TVL: APY and deposit asset."""
     out = Out(json_out, quiet, verbose, format)
     net = resolve_network(network)
-    rows = [_vault_row(v) for v in morpho.vaults(net.chain_id)]
+    rows = [morpho.vault_row(v) for v in morpho.vaults(net.chain_id)]
     if not rows:
         raise ChainqError(f"no Morpho vaults on {net.name}")
     if coin:

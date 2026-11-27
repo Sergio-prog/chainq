@@ -12,7 +12,7 @@ from web3.types import RPCEndpoint, RPCResponse
 from chainq.catalog import CatalogToken
 from chainq.config import settings
 from chainq.errors import ChainqError
-from chainq.networks import NETWORKS, Network
+from chainq.networks import Network
 
 ERC20_ABI = [
     {
@@ -275,48 +275,8 @@ def connect(network: Network) -> ChainClient:
     return ChainClient(w3=w3, network=network, provider=provider)
 
 
-def resolve_address(value: str) -> str:
-    value = value.strip()
-    if value.lower().endswith(".eth"):
-        client = connect(NETWORKS["ethereum"])
-        resolved = client.w3.ens.address(value)
-        if resolved is None:
-            raise ChainqError(f"could not resolve ENS name '{value}'")
-        return resolved
-    try:
-        return Web3.to_checksum_address(value)
-    except Exception as exc:
-        raise ChainqError(f"invalid address '{value}'") from exc
-
-
 def erc20(client: ChainClient, address: str):
     return client.w3.eth.contract(address=Web3.to_checksum_address(address), abi=ERC20_ABI)
-
-
-def sweep_balances(client: ChainClient, address: str, tokens: dict[str, str]) -> tuple[int, list[dict]]:
-    items = list(tokens.items())
-    calls = [(MULTICALL3_ADDRESS, encode_get_eth_balance(address))]
-    for _, token_address in items:
-        calls.append((token_address, encode_erc20("balanceOf", [Web3.to_checksum_address(address)])))
-        calls.append((token_address, encode_erc20("decimals")))
-        calls.append((token_address, encode_erc20("symbol")))
-    results = multicall(client, calls)
-    wei = decode_uint(results[0]) if results[0] else 0
-    rows = []
-    for i, (registry_symbol, token_address) in enumerate(items):
-        raw, decimals, symbol = results[1 + 3 * i : 4 + 3 * i]
-        if raw is None or not decode_uint(raw):
-            continue
-        rows.append(
-            {
-                "registry_symbol": registry_symbol,
-                "token_address": token_address,
-                "symbol": decode_string(symbol) if symbol else registry_symbol.upper(),
-                "raw_amount": decode_uint(raw),
-                "decimals": decode_uint(decimals) if decimals else 18,
-            }
-        )
-    return wei, rows
 
 
 SWEEP_CHUNK = 1500

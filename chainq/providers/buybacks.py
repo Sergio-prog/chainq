@@ -251,7 +251,7 @@ def _zro_snapshot() -> dict:
         as_of=ZRO_SNAPSHOT_AS_OF,
         window_days=None,
         note=f"live fetch of layerzero.foundation failed; retained monthly snapshot as of "
-        f"{ZRO_SNAPSHOT_AS_OF} (source data only, may be stale) — re-verify at the source URL",
+        f"{ZRO_SNAPSHOT_AS_OF} (source data only, may be stale); re-verify at the source URL",
         periods=periods,
     )
 

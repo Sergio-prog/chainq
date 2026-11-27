@@ -1,7 +1,5 @@
-import httpx
 
 from chainq import cache, http
-from chainq.config import settings
 from chainq.errors import ChainqError
 
 GRAPHQL_URL = "https://api.v3.aave.com/graphql"
@@ -32,19 +30,31 @@ MARKETS_QUERY = """
 
 
 def markets(chain_id: int) -> list[dict]:
-    key = cache.key_for("aave-markets", chain_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-    try:
-        resp = http.post(GRAPHQL_URL, json={"query": MARKETS_QUERY % chain_id}, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"Aave API request failed: {exc}") from exc
-    if resp.status_code >= 400:
-        raise ChainqError(f"Aave API returned HTTP {resp.status_code}")
-    payload = resp.json()
-    if payload.get("errors"):
-        raise ChainqError(f"Aave API error: {payload['errors'][0].get('message', payload['errors'])}")
-    result = payload["data"]["markets"]
-    cache.put(key, result, ttl=60)
-    return result
+    def fetch() -> list[dict]:
+        result = http.fetch_graphql("Aave API", GRAPHQL_URL, MARKETS_QUERY % chain_id).get("markets")
+        if not isinstance(result, list):
+            raise ChainqError("Aave API returned an unexpected payload (no markets)")
+        return result
+
+    return cache.remember(("aave-markets", chain_id), 60, fetch)
+
+
+def market_label(name: str) -> str:
+    return name.removeprefix("AaveV3") or name
+
+
+def reserve_row(market: dict, reserve: dict) -> dict:
+    supply = reserve.get("supplyInfo") or {}
+    borrow = reserve.get("borrowInfo") or {}
+    return {
+        "market": market_label(market["name"]),
+        "symbol": (reserve.get("underlyingToken") or {}).get("symbol"),
+        "supply_apy_pct": float(supply["apy"]["value"]) * 100 if supply.get("apy") else None,
+        "borrow_apy_pct": float(borrow["apy"]["value"]) * 100 if borrow.get("apy") else None,
+        "supplied_usd": float(reserve["size"]["usd"]) if reserve.get("size") else None,
+        "borrowed_usd": float(borrow["total"]["usd"]) if borrow.get("total") else None,
+        "available_usd": float(borrow["availableLiquidity"]["usd"]) if borrow.get("availableLiquidity") else None,
+        "utilization_pct": float(borrow["utilizationRate"]["value"]) * 100 if borrow.get("utilizationRate") else None,
+        "collateral": supply.get("canBeCollateral"),
+        "frozen": reserve.get("isFrozen"),
+    }

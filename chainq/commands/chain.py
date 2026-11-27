@@ -11,6 +11,7 @@ from web3.types import RPCEndpoint
 
 from chainq import catalog, pricing, solana
 from chainq.errors import ChainqError
+from chainq.evm_address import resolve_address
 from chainq.fmt import bold, dim, fmt_amount, fmt_gwei, fmt_usd, short_addr
 from chainq.networks import NETWORKS, resolve_network
 from chainq.output import FormatOpt, JsonOpt, Out, QuietOpt, VerboseOpt
@@ -23,7 +24,6 @@ from chainq.rpc import (
     encode_erc20,
     erc20,
     multicall,
-    resolve_address,
 )
 from chainq.tokens import resolve_token
 

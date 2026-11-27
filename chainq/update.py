@@ -1,5 +1,4 @@
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -7,10 +6,10 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-import httpx
 import typer
 
 from chainq import __version__
+from chainq.config import settings
 from chainq.errors import ChainqError
 
 PYPI_URL = "https://pypi.org/pypi/chainq/json"
@@ -27,14 +26,16 @@ def parse_version(version: str) -> tuple[int, ...]:
 
 
 def fetch_latest_version() -> str | None:
+    from chainq import http
+
     try:
-        resp = httpx.get(PYPI_URL, timeout=5)
+        resp = http.get(PYPI_URL, retries=0, timeout=5)
         if resp.status_code == 200:
             return resp.json()["info"]["version"]
     except Exception:
         pass
     try:
-        resp = httpx.get(RAW_PYPROJECT_URL, timeout=5, follow_redirects=True)
+        resp = http.get(RAW_PYPROJECT_URL, retries=0, timeout=5, follow_redirects=True)
         if resp.status_code == 200:
             for line in resp.text.splitlines():
                 if line.strip().startswith("version") and '"' in line:
@@ -69,7 +70,7 @@ def run_background_check() -> None:
 
 
 def maybe_remind() -> None:
-    if os.environ.get("CHAINQ_NO_UPDATE_CHECK"):
+    if settings.no_update_check:
         return
     state = _read_state()
     now = time.time()
@@ -79,7 +80,7 @@ def maybe_remind() -> None:
         and parse_version(latest) > parse_version(__version__)
         and now - state.get("reminded_at", 0) > CHECK_INTERVAL_SECONDS
     ):
-        print(f"chainq {latest} is available (you have {__version__}) — run `chainq update`", file=sys.stderr)
+        print(f"chainq {latest} is available (you have {__version__}); run `chainq update`", file=sys.stderr)
         state["reminded_at"] = now
         _write_state(state)
     if now - state.get("checked_at", 0) > CHECK_INTERVAL_SECONDS:

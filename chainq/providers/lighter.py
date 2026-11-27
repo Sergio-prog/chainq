@@ -1,27 +1,30 @@
-import httpx
-
 from chainq import cache, http
-from chainq.config import settings
 from chainq.errors import ChainqError
+from chainq.http import UpstreamError
 
 BASE_URL = "https://mainnet.zklighter.elliot.ai/api/v1"
 
 
-def _get(path: str, params: dict | None = None, ttl: float = 15) -> dict:
-    key = cache.key_for("lighter", path, params)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
+def _error_message(exc: UpstreamError) -> str:
     try:
-        resp = http.get(f"{BASE_URL}{path}", params=params or {}, timeout=settings.http_timeout)
-    except httpx.HTTPError as exc:
-        raise ChainqError(f"Lighter API request failed: {exc}") from exc
-    payload = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-    if resp.status_code >= 400 or payload.get("code") not in (200, None):
-        message = payload.get("message") or f"HTTP {resp.status_code}"
-        raise ChainqError(f"Lighter API error: {message}")
-    cache.put(key, payload, ttl)
+        return exc.response.json().get("message") or str(exc)
+    except (ValueError, AttributeError):
+        return str(exc)
+
+
+def _fetch(path: str, params: dict | None) -> dict:
+    try:
+        payload = http.fetch_json("Lighter API", f"{BASE_URL}{path}", params=params or {})
+    except UpstreamError as exc:
+        raise ChainqError(f"Lighter API error: {_error_message(exc)}") from exc
+    if not isinstance(payload, dict) or payload.get("code") not in (200, None):
+        message = payload.get("message") if isinstance(payload, dict) else None
+        raise ChainqError(f"Lighter API error: {message or 'unexpected payload'}")
     return payload
+
+
+def _get(path: str, params: dict | None = None, ttl: float = 15) -> dict:
+    return cache.remember(("lighter", path, params), ttl, lambda: _fetch(path, params))
 
 
 def markets() -> list[dict]:
@@ -106,9 +109,19 @@ def funding_rates() -> dict[str, float]:
     return {r["symbol"]: float(r["rate"]) for r in rates if r.get("exchange") == "lighter"}
 
 
-def account(l1_address: str) -> dict:
-    payload = _get("/account", {"by": "l1_address", "value": l1_address}, ttl=5)
+def find_account(l1_address: str) -> dict | None:
+    try:
+        payload = _get("/account", {"by": "l1_address", "value": l1_address}, ttl=5)
+    except ChainqError as exc:
+        if "not found" in str(exc):
+            return None
+        raise
     accounts = payload.get("accounts") or []
-    if not accounts:
+    return accounts[0] if accounts else None
+
+
+def account(l1_address: str) -> dict:
+    found = find_account(l1_address)
+    if found is None:
         raise ChainqError(f"no Lighter account found for {l1_address}")
-    return accounts[0]
+    return found
